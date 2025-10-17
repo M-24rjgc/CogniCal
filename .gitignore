@@ -1,0 +1,85 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build outputs
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Playwright artifacts
+playwright-report
+test-results
+.ms-playwright
+
+# Python virtual environment (from .venv/)
+.venv
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS files
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# IDE specific
+.kilocode/
+.fleet/
+*.code-workspace
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Optional: Internal documentation (uncomment if you want to keep these private)
+# These seem to be development logs and internal documentation
+# API_CALL_CHAIN_ISSUE.md
+# BUG_FIX_REPORT.md
+# CACHE_CLEAR_FEATURE.md
+# COMPILATION_ERROR_FIX.md
+# DEEPSEEK_KEY_FIX.md
+# FINAL_SUMMARY.md
+# FINAL_VALIDATION_SUMMARY.md
+# FINAL_VERIFICATION_REPORT.md
+# GENERATE_PLAN_FIX.md
+# IMPLEMENTATION_SUMMARY.md
+# MY_MISTAKE_ANALYSIS.md
+# OPERATION_LOG.md
+# PROJECT_COMPLETION_STATEMENT.md
+# PROJECT_DELIVERABLES.md
+
+# Spec workflow (internal workflow tool - uncomment to exclude)
+# .spec-workflow/

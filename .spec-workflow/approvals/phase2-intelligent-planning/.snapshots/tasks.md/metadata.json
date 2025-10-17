@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/phase2-intelligent-planning/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-10T08:19:23.487Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760084363436_jxkrcy8wg",
+      "approvalTitle": "Phase 2 Intelligent Planning — Tasks"
+    }
+  ]
+}

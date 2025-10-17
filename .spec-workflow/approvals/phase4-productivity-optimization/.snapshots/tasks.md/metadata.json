@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/phase4-productivity-optimization/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-13T02:51:26.440Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760323886304_1k73pudug",
+      "approvalTitle": "Phase 4 Productivity Optimization Task Plan"
+    }
+  ]
+}

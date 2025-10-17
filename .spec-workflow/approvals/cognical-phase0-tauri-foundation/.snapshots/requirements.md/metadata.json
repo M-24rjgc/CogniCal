@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/cognical-phase0-tauri-foundation/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-07T19:24:54.161Z",
+      "trigger": "initial",
+      "approvalId": "approval_1759865094144_62jqpdfhu",
+      "approvalTitle": "Review requirements for cognical-phase0-tauri-foundation"
+    }
+  ]
+}

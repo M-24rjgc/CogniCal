@@ -1,0 +1,131 @@
+# Tasks Document
+
+- [x] 1. 启动 Tauri + React 项目骨架
+  - 文件：`package.json`，`pnpm-lock.yaml`，`src-tauri/Cargo.toml`，`src-tauri/tauri.conf.json`，`tsconfig.json`，`vite.config.ts`
+  - 操作：
+    - 使用 `pnpm dlx create-tauri-app` 初始化 Tauri 2 + React + TypeScript 项目，保留 pnpm 作为包管理器。
+    - 清理模板多余文件，使目录结构符合 `structure.md` 定义。
+    - 验证 `pnpm tauri dev` 能够在 3 秒内启动默认窗口。
+  - 目的：交付需求 1 的最小可运行桌面应用骨架。
+  - 参考：`.spec-workflow/steering/structure.md`，`.spec-workflow/steering/tech.md`（Frontend Stack，Tooling）。
+  - 覆盖需求：需求 1。
+  - _Leverage: 结构文档中的目录基线；design.md「Project Bootstrap」。_
+  - _Requirements: Requirement 1_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Full-stack Tauri Engineer | Task: Bootstrap the repo with create-tauri-app, prune unused demo assets, ensure pnpm + Vite + React + Rust wiring matches steering docs | Restrictions: Keep generated license/README placeholders, do not introduce extra dependencies beyond模板 | \_Leverage: structure.md, tech.md front-end stack摘要 | \_Requirements: Requirement 1 | Success: `pnpm tauri dev` 启动成功且目录与结构文档一致 | Instructions: 开始前将本任务从`[ ]`改为`[-]`，完成后改为`[x]`并保持其他任务状态不变。_
+
+- [x] 2. 配置前端依赖与开发脚本
+  - 文件：`package.json`，`tsconfig.json`，`vite.config.ts`，`.eslintrc.cjs`，`.prettierrc`，`tailwind.config.js`（占位），`postcss.config.cjs`（占位）
+  - 操作：
+    - 安装 React Router v6、@tanstack/react-query、Zustand、react-hook-form、zod 等核心依赖。
+    - 配置 ESLint + Prettier（含 TypeScript 插件）与 `lint`、`format`、`typecheck`、`test`、`dev`、`build` 脚本。
+    - 启用 TypeScript strict 模式，确保编译无警告。
+  - 目的：落实需求 2、需求 10 的工具链规范。
+  - 参考：`design.md`「Tooling & Scripts」，`.spec-workflow/steering/tech.md`「Frontend Stack」。
+  - 覆盖需求：需求 2，需求 10。
+  - _Leverage: `design.md` tooling 表格；已有 package baseline。_
+  - _Requirements: Requirements 2, 10_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Tooling Engineer | Task: Wire up React Router, React Query, Zustand, RHF, Zod and configure lint/format/typecheck/test scripts with strict TypeScript | Restrictions: 不得安装未列出的依赖，脚本需兼容 pnpm + Windows | \_Leverage: design.md Tooling & Scripts, steering tech stack | \_Requirements: Requirements 2 & 10 | Success: `pnpm lint`, `pnpm typecheck`, `pnpm test`、`pnpm dev` 均通过 | Instructions: 标记任务状态 `[ ]→[-]→[x]`，勿修改其他任务。_
+
+- [x] 3. 搭建 Tailwind + shadcn/ui 样式体系
+  - 文件：`tailwind.config.js`，`postcss.config.cjs`，`src/styles/globals.css`，`src/lib/utils.ts`
+  - 操作：
+    - 配置 Tailwind 暗黑模式（class），引入 shadcn/ui preset、自定义色板与字体。
+    - 将 PostCSS 插件链设为 `tailwindcss` + `autoprefixer`。
+    - 初始化全局 CSS 并导入 shadcn/ui token，覆盖基础排版。
+  - 目的：满足需求 2 与需求 3 的样式基础。
+  - 参考：`design.md`「Styling」「Theme System」。
+  - 覆盖需求：需求 2，需求 3。
+  - _Leverage: shadcn/ui 安装指南；design.md Theme System。_
+  - _Requirements: Requirements 2, 3_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: UI Foundation Engineer | Task: Configure Tailwind + shadcn/ui pipeline, set dark/light theme tokens, ensure globals.css 引入 base/components/utilities | Restrictions: 不手动改 shadcn/ui 生成的 token 文件；Tailwind 配置保持 ESM | \_Leverage: design.md Theme System, steering tech Tailwind section | \_Requirements: Requirements 2 & 3 | Success: `pnpm dev` 页面展示基础主题并可切换暗色模式 | Instructions: 按 `[ ]→[-]→[x]` 更新状态。_
+
+- [x] 4. 建立 React 入口与路由骨架
+  - 文件：`src/main.tsx`，`src/App.tsx`，`src/routes/index.tsx`
+  - 操作：
+    - 在入口中挂载 QueryClientProvider、RouterProvider、Theme/Toast Provider 占位。
+    - App 层引入全局样式并渲染 AppShell placeholder。
+    - 配置基础路由（Dashboard、Tasks、Calendar、Settings）。
+  - 目的：支撑需求 2、需求 8 的路由、状态容器。
+  - 参考：`design.md`「AppShell Composition」。
+  - 覆盖需求：需求 2，需求 8。
+  - _Leverage: design.md AppShell diagrams。_
+  - _Requirements: Requirements 2, 8_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: React Infrastructure Engineer | Task: Compose providers (QueryClient, Router, Theme) and scaffold placeholder routes consistent with AppShell | Restrictions: 不实现业务组件，仅放占位符；保持文件命名与结构文档一致 | \_Leverage: design.md AppShell, steering structure | \_Requirements: Requirements 2 & 8 | Success: 导航可以无刷切换页面且不报错 | Instructions: 任务执行前 `[ ]→[-]`，完成改 `[x]`。_
+
+- [x] 5. 实现响应式 AppShell 与侧边栏
+  - 文件：`src/components/layout/AppShell.tsx`，`src/components/layout/Sidebar.tsx`，`src/components/layout/Header.tsx`
+  - 操作：
+    - 采用 shadcn/ui primitives 构建桌面侧边栏 + 顶部栏 + 内容区域。
+    - 支持宽屏恒显、窄屏抽屉、当前路由高亮、主题切换入口。
+    - 暴露 slot，使页面可插入操作按钮。
+  - 目的：落实需求 3、需求 8 的布局协议。
+  - 参考：`design.md`「AppShell」「Navigation Layout」，`.spec-workflow/steering/structure.md`。
+  - 覆盖需求：需求 3，需求 8。
+  - _Leverage: design AppShell 线框；shadcn/ui Layout 示例。_
+  - _Requirements: Requirements 3, 8_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: React UI Developer | Task: Build responsive AppShell with sidebar/header slots and route highlighting | Restrictions: 不在组件中写死页面内容，保留可扩展 props | \_Leverage: design.md AppShell, steering structure | \_Requirements: Requirements 3 & 8 | Success: 手动缩放窗口侧边栏自动切换模式，导航高亮准确 | Instructions: 更新状态 `[ ]→[-]→[x]`。_
+
+- [x] 6. 前端任务数据模型与校验
+  - 文件：`src/types/task.ts`，`src/utils/validators.ts`
+  - 操作：
+    - 定义 `Task`, `TaskPayload`, `TaskFilters` 等类型，覆盖必填字段与 AI 扩展字段占位。
+    - 使用 zod 构建创建/更新 schema，并暴露表单错误格式化工具。
+  - 目的：支撑需求 6、可靠性非功能指标。
+  - 参考：`design.md`「Data Models」「Validation」。
+  - 覆盖需求：需求 6，NFR（可靠性）。
+  - _Leverage: design 数据模型表；requirements 中的字段清单。_
+  - _Requirements: Requirement 6_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: TypeScript Domain Modeler | Task: Define strongly typed task models and zod schemas used across store/forms | Restrictions: 不在此任务中调用 Tauri；保持类型统一导出 | \_Leverage: design Data Models, requirements 必填字段 | \_Requirements: Requirement 6 | Success: 类型在 `tsc --noEmit` 下无错误，schema 覆盖所有必填字段 | Instructions: `[ ]→[-]→[x]`。_
+
+- [x] 7. Zustand 任务状态与 Tauri API 封装
+  - 文件：`src/stores/taskStore.ts`，`src/services/tauriApi.ts`，`src/hooks/useTasks.ts`
+  - 操作：
+    - 使用 Zustand 定义任务列表、详情、loading、error 状态切片。
+    - 封装 Tauri `invoke` 调用，提供 CRUD Helper 并统一错误映射。
+    - 提供 `useTasks` Hook 暴露 store selector。
+  - 目的：满足需求 6、需求 7 的前后端通信基线。
+  - 参考：`design.md`「TaskStore」「Frontend Services」。
+  - 覆盖需求：需求 6，需求 7。
+  - _Leverage: design TaskStore diagrams；Tauri invoke 文档。_
+  - _Requirements: Requirements 6, 7_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: React State Management Specialist | Task: Create taskStore with CRUD async actions consuming a typed tauriApi wrapper | Restrictions: 不直接在组件里调用 invoke；错误需映射为 AppError code | \_Leverage: design TaskStore, Frontend Services 章节 | \_Requirements: Requirements 6 & 7 | Success: store 方法可在 Vitest 中被 mock 调用并正确更新状态 | Instructions: `[ ]→[-]→[x]`。_
+
+- [x] 8. 构建任务 CRUD UI 组件
+  - 文件：`src/components/tasks/TaskTable.tsx`，`src/components/tasks/TaskFormDialog.tsx`，`src/components/tasks/TaskDetailsDrawer.tsx`，`src/pages/Tasks.tsx`，`src/hooks/useTaskForm.ts`
+  - 操作：
+    - 使用 shadcn/ui Table、Dialog、Sheet 等组件构建任务列表、表单、详情抽屉。
+    - 将 Zustand store 接入界面，处理加载、错误、分页（占位）。
+    - 集成 react-hook-form + zod 验证，提供复用的表单 Hook。
+  - 目的：覆盖需求 3、需求 6、需求 8 的核心交互。
+  - 参考：`design.md`「TaskListPage」「Task Form」「Task Detail」。
+  - 覆盖需求：需求 3，需求 6，需求 8。
+  - _Leverage: design UI 线框；shadcn/ui 组件文档。_
+  - _Requirements: Requirements 3, 6, 8_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Senior React Developer | Task: Build full CRUD UI wiring store + validation + dialogs | Restrictions: 不直接 mock 数据库，所有数据通过 store；保持组件 props 可拓展 | \_Leverage: design TaskListPage, Task Form, Task Detail sections | \_Requirements: Requirements 3/6/8 | Success: 手动测试创建/编辑/删除任务流程，无控制台错误 | Instructions: 更新任务状态 `[ ]→[-]→[x]`。_
+
+- [x] 9. 构建 SQLite 数据层与服务层
+  - 文件：`src-tauri/src/db/mod.rs`，`src-tauri/src/db/schema.sql`，`src-tauri/src/db/repositories/task_repository.rs`，`src-tauri/src/services/task_service.rs`，`src-tauri/src/error.rs`
+  - 操作：
+    - 初始化数据库连接管理器，确保首次启动建库并执行 `schema.sql`。
+    - 实现 `TaskRepository` CRUD（参数化查询），`TaskService` 处理验证、事务、DTO。
+    - 扩展 `AppError`，覆盖未找到、冲突、校验失败等分支并写入日志。
+  - 目的：满足需求 5、需求 6、需求 7、需求 9 的后端核心。
+  - 参考：`design.md`「Database Layer」「TaskRepository」「TaskService」「Error Handling」。
+  - 覆盖需求：需求 5，需求 6，需求 7，需求 9。
+  - _Leverage: design backend section；steering tech database schema。_
+  - _Requirements: Requirements 5, 6, 7, 9_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Rust Backend Engineer | Task: Build SQLite bootstrap, repository, service, and AppError mapping per design | Restrictions: 只使用 rusqlite，不引入 Diesel；所有 SQL 必须参数化 | \_Leverage: design Database/TaskService sections, steering tech | \_Requirements: Requirements 5/6/7/9 | Success: `cargo test` 集成测试验证 CRUD 成功，日志捕获错误 | Instructions: `[ ]→[-]→[x]`。_
+
+- [x] 10. 暴露 Tauri Commands 与可观测性
+  - 文件：`src-tauri/src/commands/mod.rs`，`src-tauri/src/commands/task.rs`，`src-tauri/src/main.rs`，`src-tauri/src/utils/logger.rs`，`src/stores/uiStore.ts`，`src/components/common/ToastProvider.tsx`，`playwright.config.ts`，`tests/integration/task_service_tests.rs`，`src/__tests__/taskStore.test.ts`，`.husky/pre-commit`，`.lintstagedrc`
+  - 操作：
+    - 注册 CRUD Tauri Commands，启动时注入共享状态并初始化数据库。
+    - 实现日志与前端 toast 通知机制，映射 AppError → 用户文案。
+    - 配置 Vitest、cargo 集成测试、Playwright 冒烟用例与 Husky pre-commit（lint/format/typecheck/test）。
+  - 目的：完成需求 7、需求 9、需求 10 以及可靠性、可维护性指标。
+  - 参考：`design.md`「IPC Commands」「Error Handling」「Testing Strategy」。
+  - 覆盖需求：需求 7，需求 9，需求 10。
+  - _Leverage: design commands/testing 章节；steering tech CI/CD。_
+  - _Requirements: Requirements 7, 9, 10_
+  - _Prompt: Implement the task for spec phase0-foundation, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Full-stack Quality Engineer | Task: Wire IPC commands, logging/toast feedback, and baseline unit/integration/e2e tests with Husky hooks | Restrictions: Tests需无头运行；pre-commit 兼容 Windows；不要跳过 lint | \_Leverage: design Testing Strategy, IPC Commands section | \_Requirements: Requirements 7/9/10 | Success: `pnpm lint`、`pnpm typecheck`、`pnpm test`、`cargo test`、`pnpm run e2e`（占位）通过，前端可显示错误 toast | Instructions: 按 `[ ]→[-]→[x]` 更新状态并记录测试结果。_
+  - 验证：`pnpm lint`、`pnpm typecheck`、`pnpm test`、`pnpm run e2e`、`cargo test --manifest-path src-tauri/Cargo.toml`

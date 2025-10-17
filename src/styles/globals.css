@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --primary: 222 89% 61%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 215 16% 47%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 16% 35%;
+
+    --accent: 221 83% 53%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 222 89% 61%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 221 39% 11%;
+    --sidebar-foreground: 214 31% 91%;
+    --sidebar-primary: 215 84% 62%;
+    --sidebar-secondary: 215 16% 47%;
+    --sidebar-muted: 223 47% 20%;
+    --sidebar-border: 223 47% 20%;
+  }
+
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+
+    --primary: 224 76% 66%;
+    --primary-foreground: 221 39% 11%;
+
+    --secondary: 215 16% 47%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 223 47% 20%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 271 91% 65%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 223 47% 18%;
+    --input: 223 47% 18%;
+    --ring: 224 76% 66%;
+
+    --sidebar-background: 223 47% 12%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-primary: 224 76% 66%;
+    --sidebar-secondary: 215 20% 65%;
+    --sidebar-muted: 223 47% 16%;
+    --sidebar-border: 223 47% 18%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading tracking-tight text-foreground;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+  }
+}

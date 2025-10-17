@@ -1,0 +1,71 @@
+# Tasks: DeepSeek API Integration
+
+- [x] 1. Define AIProvider trait and DTOs (Rust)
+  - File(s): src-tauri/src/services/ai_service.rs (trait section), src-tauri/src/models/ai_types.rs (new)
+  - Purpose: Unify online/offline providers with a common contract
+  - _Leverage: src-tauri/src/services/cot_engine.rs, src-tauri/src/services/ai_service.rs_
+  - _Requirements: Requirement 1, 5, 6_
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Senior Rust Engineer (Tauri) | Task: Create AIProvider trait with parse_task, generate_recommendations, plan_schedule signatures and shared DTOs in ai_types.rs; refactor existing ai_service.rs to use the trait. | Restrictions: Backward compatible IPC signatures, no breaking changes to commands; keep modules small and documented. | \_Leverage: cot_engine.rs for offline logic, existing ai_service.rs wiring | \_Requirements: R1 (DeepSeek call), R5 (Online/Offline switch), R6 (Prompt templates) | Success: Trait compiles, DTOs used across providers, existing code builds without behavior change._
+
+- [x] 2. Implement DeepSeekProvider (Rust, online)
+  - File(s): src-tauri/src/services/ai_service.rs (impl), src-tauri/src/services/prompt_templates.rs (new)
+  - Purpose: Real HTTP calls to DeepSeek API with timeout and retry
+  - _Leverage: reqwest, serde_json, tokio; design.md HTTP contract_
+  - _Requirements: Requirement 1, 3, 4, 6, 7, 8_
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Rust Backend Engineer | Task: Implement DeepSeekProvider with invoke_chat(), payload builders (parse/recommend/plan); use structured system prompts from prompt_templates.rs; implement timeout(10s) + backoff (1s/2s/4s) + error mapping; redact logs. | Restrictions: HTTPS only, no full payload logging, map 401/429/5xx/timeout distinctly | \_Leverage: design.md HTTP section, error.rs AppResult types | \_Requirements: R1,R3,R4,R6,R7,R8 | Success: Unit tests stub pass, manual call works with mock key._
+
+- [x] 3. Implement LocalCotProvider (Rust, offline)
+  - File(s): src-tauri/src/services/cot_engine.rs (adapt), src-tauri/src/services/ai_service.rs (impl)
+  - Purpose: Provide offline fallback with same interface
+  - _Leverage: existing cot_engine.rs_
+  - _Requirements: Requirement 5_
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Rust Engineer | Task: Adapt cot_engine to implement AIProvider methods; return DTOs consistent with online provider. | Restrictions: Keep deterministic outputs; ensure fast (<100ms) | \_Leverage: cot_engine.rs | \_Requirements: R5 | Success: Provider returns structured results; unit tests green._
+
+- [x] 4. Add AiCache with SQLite tables and migrations
+  - File(s): src-tauri/src/db/migrations.rs (update), src-tauri/src/services/cache_service.rs (extend), src-tauri/src/services/ai_cache.rs (new)
+  - Purpose: Cache results to reduce API cost
+  - _Leverage: existing cache_service.rs patterns_
+  - \_Requirements: Requirement 7 (cache)
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Rust Engineer (SQLite) | Task: Create ai_settings and ai_cache tables, add CRUD helpers, compute cache keys (hash of normalized input + op type), TTL policies; integrate in AiService facade. | Restrictions: Do not log PII; ensure migrations idempotent | \_Leverage: migrations.rs, cache_service.rs | \_Requirements: R7 | Success: Migrations run, cache hit reduces API calls in unit tests._
+
+- [x] 5. Secure API key storage via OS keyring + AES-256-GCM
+  - File(s): src-tauri/src/services/settings_service.rs (extend), src-tauri/src/utils/crypto.rs (new)
+  - Purpose: Encrypt and store API key securely
+  - _Leverage: keyring crate (or tauri-plugin), ring/aes-gcm crates_
+  - \_Requirements: Security section
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Security-minded Rust Engineer | Task: Implement AES-256-GCM encrypt/decrypt helpers; derive key from OS keyring secret via PBKDF2; store ciphertext in ai_settings; add getters/setters. | Restrictions: Never print or log secrets; handle migration/rotation | \_Leverage: settings_service.rs | \_Requirements: Security | Success: Unit tests for encrypt/decrypt; manual key set/get works._
+
+- [x] 6. Tauri Commands: wire AiService methods
+  - File(s): src-tauri/src/commands/ai_commands.rs (new), src-tauri/src/lib.rs (mod), src-tauri/src/main.rs (invoke_handler)
+  - Purpose: Expose parse/recommend/plan to frontend
+  - _Leverage: existing command modules patterns_
+  - \_Requirements: All user-facing flows
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Tauri Engineer | Task: Create ai_commands.rs with three commands; map DTOs to JSON; consistent error types; register in invoke_handler. | Restrictions: Maintain backward compatibility; do not block UI thread | \_Leverage: commands pattern | \_Requirements: R1-R5 | Success: Commands callable from frontend; smoke tests pass._
+
+- [x] 7. Frontend: Settings UI for API key + mode
+  - File(s): src/pages/Settings.tsx (edit), src/stores/settingsStore.ts (extend), src/hooks/useAI.ts (new)
+  - Purpose: Allow users to set/test API key; show online/offline state
+  - _Leverage: shadcn/ui components; existing settings store patterns_
+  - \_Requirements: Requirement 2
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: React Developer | Task: Add AI section with masked input, Test button (calls ping via ai command), status badge; persist encrypted key via Tauri command. | Restrictions: Never echo key; debounce network calls | \_Leverage: Settings.tsx, toast provider | \_Requirements: R2 | Success: Key can be set/tested; status reflects mode._
+
+- [x] 8. Frontend: Task form AI parsing + CoT panel
+  - File(s): src/hooks/useTaskForm.ts (edit), src/hooks/useAI.ts (use), src/components/tasks/TaskForm.tsx (edit)
+  - Purpose: Trigger parse and show results+CoT
+  - \_Leverage: current task creation flow
+  - \_Requirements: Requirement 1, 8
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Engineer | Task: Integrate parseTask into task form; loading state; editable fields; CoT collapsible panel; handle errors with retry and fallback switches. | Restrictions: Non-blocking UX; retain user edits | \_Leverage: useTaskForm, toast | \_Requirements: R1,R8 | Success: Natural text → parsed fields; user can adjust; CoT viewable._
+
+- [x] 9. Frontend: Recommendations and scheduling flows
+  - File(s): src/hooks/usePlanning.ts (edit), src/components/planning/\* (edit), src/hooks/useAI.ts
+  - Purpose: Generate recommendations and schedule; accept/reject with feedback
+  - \_Leverage: planning and analytics components
+  - \_Requirements: Requirement 3, 4
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Frontend Engineer | Task: Add generateRecommendations and planSchedule actions; render recommendation cards with accept/reject; reflect updates; conflict highlights. | Restrictions: Batch UI updates; guard against duplicate calls | \_Leverage: usePlanning, components | \_Requirements: R3,R4 | Success: Usable flows; adoption metrics tracked locally._
+
+- [x] 10. Tests: Rust unit/integration + Playwright E2E
+  - File(s): src-tauri/tests/ai_service_tests.rs (new), src-tauri/tests/ai_commands_tests.rs (new), e2e/ai.e2e.ts (new)
+  - Purpose: Ensure reliability across modes and errors
+  - \_Leverage: existing test harness
+  - \_Requirements: Testing strategy section
+  - _Prompt: Implement the task for spec deepseek-api-integration, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Test Engineer | Task: Write unit tests for provider payloads and error mapping; integration tests for command layer; E2E for full user flow (set key → parse → adjust → accept). | Restrictions: No real API calls in CI; use mocks | \_Leverage: vitest/playwright configs | \_Requirements: Testing | Success: Tests pass locally; CI green._

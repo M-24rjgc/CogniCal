@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/deepseek-api-integration/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-14T12:20:42.049Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760444442000_stqhbeq05",
+      "approvalTitle": "DeepSeek API 集成 - Design 文档审批"
+    }
+  ]
+}

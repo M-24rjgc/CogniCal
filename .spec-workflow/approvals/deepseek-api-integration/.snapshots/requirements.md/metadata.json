@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/deepseek-api-integration/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-14T11:59:00.573Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760443140534_13pxdpr69",
+      "approvalTitle": "DeepSeek API 集成 - Requirements 文档审批"
+    }
+  ]
+}

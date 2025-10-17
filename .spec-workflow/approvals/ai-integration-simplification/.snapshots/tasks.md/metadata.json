@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/ai-integration-simplification/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-15T15:42:50.556Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760542970495_n4g5jbcf4",
+      "approvalTitle": "ai-integration-simplification tasks"
+    }
+  ]
+}

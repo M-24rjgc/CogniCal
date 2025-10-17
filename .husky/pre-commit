@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+set -e
+
+pnpm exec lint-staged
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm run e2e
+(
+  cd src-tauri
+  cargo test
+)

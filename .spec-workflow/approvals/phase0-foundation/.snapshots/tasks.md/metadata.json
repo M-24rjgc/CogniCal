@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/phase0-foundation/tasks.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-07T18:12:41.399Z",
+      "trigger": "initial",
+      "approvalId": "approval_1759860761381_n4cbi59f7",
+      "approvalTitle": "Phase 0 Foundation - Tasks Document"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-10-07T19:48:13.877Z",
+      "trigger": "approved",
+      "approvalId": "approval_1759866472185_ruoqmmfx0",
+      "approvalTitle": "Phase0 foundation tasks document re-approval"
+    }
+  ]
+}

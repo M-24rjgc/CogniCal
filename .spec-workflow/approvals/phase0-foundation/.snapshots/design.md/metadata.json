@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/phase0-foundation/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-07T18:10:01.996Z",
+      "trigger": "initial",
+      "approvalId": "approval_1759860601977_yq6ix4f0l",
+      "approvalTitle": "Phase 0 Foundation - Design Document"
+    }
+  ]
+}

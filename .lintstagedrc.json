@@ -1,0 +1,5 @@
+{
+  "src/**/*.{ts,tsx}": ["pnpm exec eslint --max-warnings=0", "pnpm exec prettier --check"],
+  "src-tauri/src/**/*.rs": ["cargo fmt --manifest-path src-tauri/Cargo.toml --"],
+  "**/*.{js,jsx,json,css,md}": ["pnpm exec prettier --check"]
+}

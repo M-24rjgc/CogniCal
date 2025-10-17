@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/deepseek-api-integration/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-14T12:23:09.419Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760444589366_2j1ond3i4",
+      "approvalTitle": "DeepSeek API 集成 - Tasks 文档审批"
+    }
+  ]
+}

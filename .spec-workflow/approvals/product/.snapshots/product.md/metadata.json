@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/steering/product.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-10T07:46:50.848Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760082410820_5vukri9gl",
+      "approvalTitle": "Update product steering doc with phase progress context"
+    }
+  ]
+}

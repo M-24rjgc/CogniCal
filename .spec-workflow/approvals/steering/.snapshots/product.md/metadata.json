@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/steering/product.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-07T16:54:17.874Z",
+      "trigger": "initial",
+      "approvalId": "approval_1759856057853_hk84zlwqr",
+      "approvalTitle": "Product Steering Document - CogniCal 产品概述"
+    }
+  ]
+}

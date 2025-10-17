@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/phase2-intelligent-planning/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-10T08:06:47.035Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760083606990_ta7nlp6sw",
+      "approvalTitle": "Phase2 intelligent planning requirements"
+    }
+  ]
+}

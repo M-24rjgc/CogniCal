@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/phase1-intelligent-task-parsing/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-09T10:27:59.332Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760005679305_3gkslk1aa",
+      "approvalTitle": "Phase1 intelligent task parsing tasks"
+    }
+  ]
+}

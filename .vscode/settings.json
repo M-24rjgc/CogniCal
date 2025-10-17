@@ -1,0 +1,14 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "json.schemaDownload.enable": false,
+  "json.validate.enable": true,
+  "tailwindCSS.includeLanguages": {
+    "plaintext": "html",
+    "mjml": "html",
+    "css": "css"
+  },
+  "tailwindCSS.experimental.configFile": "tailwind.config.js",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}
