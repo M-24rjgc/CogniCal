@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/interactive-onboarding/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-17T20:26:18.440Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760732778326_jd17agj8k",
+      "approvalTitle": "interactive-onboarding requirements"
+    }
+  ]
+}

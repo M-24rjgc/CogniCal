@@ -1,9 +1,11 @@
+use std::collections::{BTreeMap, HashMap};
+
 use serde::Deserialize;
 use tauri::{async_runtime, State};
 
 use crate::error::AppError;
-use crate::models::settings::AppSettings;
-use crate::services::settings_service::SettingsUpdateInput;
+use crate::models::settings::{AppSettings, DashboardConfig};
+use crate::services::settings_service::{DashboardConfigUpdateInput, SettingsUpdateInput};
 
 use super::{AppState, CommandError, CommandResult};
 
@@ -32,6 +34,22 @@ pub async fn settings_clear_api_key(state: State<'_, AppState>) -> CommandResult
         service.get()
     })
     .await
+}
+
+#[tauri::command]
+pub async fn dashboard_config_get(state: State<'_, AppState>) -> CommandResult<DashboardConfig> {
+    let app_state = state.inner().clone();
+    run_blocking(move || app_state.settings().get_dashboard_config()).await
+}
+
+#[tauri::command]
+pub async fn dashboard_config_update(
+    state: State<'_, AppState>,
+    payload: DashboardConfigUpdatePayload,
+) -> CommandResult<DashboardConfig> {
+    let app_state = state.inner().clone();
+    let input = payload.into_input();
+    run_blocking(move || app_state.settings().update_dashboard_config(input)).await
 }
 
 #[derive(Debug, Deserialize)]
@@ -69,6 +87,26 @@ impl SettingsUpdatePayload {
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardConfigUpdatePayload {
+    #[serde(default)]
+    modules: Option<HashMap<String, bool>>,
+    #[serde(default)]
+    last_updated_at: Option<Option<String>>,
+}
+
+impl DashboardConfigUpdatePayload {
+    fn into_input(self) -> DashboardConfigUpdateInput {
+        DashboardConfigUpdateInput {
+            modules: self
+                .modules
+                .map(|modules| modules.into_iter().collect::<BTreeMap<_, _>>()),
+            last_updated_at: self.last_updated_at,
+        }
+    }
+}
+
 async fn run_blocking<T: Send + 'static>(
     task: impl FnOnce() -> Result<T, AppError> + Send + 'static,
 ) -> CommandResult<T> {
@@ -81,6 +119,7 @@ async fn run_blocking<T: Send + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn test_remove_deepseek_key_flag() {
@@ -148,5 +187,32 @@ mod tests {
 
         let input = payload.into_input();
         assert_eq!(input.deepseek_api_key, Some(None));
+    }
+
+    #[test]
+    fn test_dashboard_config_payload_modules() {
+        let mut modules = HashMap::new();
+        modules.insert("quick-actions".to_string(), false);
+        let payload = DashboardConfigUpdatePayload {
+            modules: Some(modules),
+            last_updated_at: None,
+        };
+
+        let input = payload.into_input();
+        let overrides = input.modules.expect("modules should be present");
+        assert_eq!(overrides.get("quick-actions"), Some(&false));
+        assert!(input.last_updated_at.is_none());
+    }
+
+    #[test]
+    fn test_dashboard_config_payload_null_timestamp() {
+        let payload = DashboardConfigUpdatePayload {
+            modules: None,
+            last_updated_at: Some(None),
+        };
+
+        let input = payload.into_input();
+        assert!(input.modules.is_none());
+        assert_eq!(input.last_updated_at, Some(None));
     }
 }

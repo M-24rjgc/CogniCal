@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
 import { TaskPlanningPanel } from '../components/tasks/TaskPlanningPanel';
 import type {
   PlanningSessionView,
@@ -170,6 +172,8 @@ const tasks: Task[] = [
   },
 ];
 
+const renderWithRouter = (ui: ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
+
 describe('TaskPlanningPanel', () => {
   beforeEach(() => {
     pushToastMock.mockReset();
@@ -179,7 +183,7 @@ describe('TaskPlanningPanel', () => {
   it('renders empty guidance when no session exists', () => {
     usePlanningMock.mockReturnValue(defaultPlanningState());
 
-    render(
+    renderWithRouter(
       <TaskPlanningPanel
         tasks={tasks}
         selectedTaskIds={[]}
@@ -205,7 +209,7 @@ describe('TaskPlanningPanel', () => {
     const onSelectionChange = vi.fn();
     const user = userEvent.setup();
 
-    render(
+    renderWithRouter(
       <TaskPlanningPanel
         tasks={tasks}
         selectedTaskIds={['task-1']}
@@ -240,7 +244,7 @@ describe('TaskPlanningPanel', () => {
 
     usePlanningMock.mockReturnValue(planningState);
 
-    render(
+    renderWithRouter(
       <TaskPlanningPanel
         tasks={tasks}
         selectedTaskIds={['task-1']}
@@ -261,7 +265,7 @@ describe('TaskPlanningPanel', () => {
 
     usePlanningMock.mockReturnValue(planningState);
 
-    render(
+    renderWithRouter(
       <TaskPlanningPanel
         tasks={tasks}
         selectedTaskIds={['task-1']}
@@ -285,7 +289,7 @@ describe('TaskPlanningPanel', () => {
     const user = userEvent.setup();
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    render(
+    renderWithRouter(
       <TaskPlanningPanel
         tasks={tasks}
         selectedTaskIds={['task-1']}
@@ -323,7 +327,7 @@ describe('TaskPlanningPanel', () => {
     const user = userEvent.setup();
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
-    render(
+    renderWithRouter(
       <TaskPlanningPanel
         tasks={tasks}
         selectedTaskIds={['task-1']}

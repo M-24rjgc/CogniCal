@@ -24,6 +24,8 @@ import { Input } from '../components/ui/input';
 import { Skeleton } from '../components/ui/skeleton';
 import type { AiStatus, ThemePreference, UpdateAppSettingsInput } from '../types/settings';
 import { isAppError, type AppError } from '../services/tauriApi';
+import DashboardSettingsForm from '../components/settings/DashboardSettingsForm';
+import { HelpPopover } from '../components/help/HelpPopover';
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
 const THEME_VALUES = ['system', 'light', 'dark'] as const;
@@ -189,7 +191,8 @@ export default function SettingsPage() {
     const payload: UpdateAppSettingsInput = {
       workdayStartMinute: startMinute,
       workdayEndMinute: endMinute,
-      themePreference: values.themePreference,
+      themePreference:
+       values.themePreference,
     };
 
     if (values.deepseekKey && values.deepseekKey.trim().length > 0) {
@@ -378,7 +381,14 @@ export default function SettingsPage() {
                 <KeyRound className="h-3.5 w-3.5" /> DeepSeek {deepseekStatus}
               </Badge>
             </div>
-            <h1 className="text-2xl font-semibold text-foreground">应用设置中心</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-foreground">应用设置中心</h1>
+              <HelpPopover
+                entryId="settings-api-key"
+                triggerLabel="查看配置 DeepSeek API Key 帮助"
+                triggerClassName="ml-1"
+              />
+            </div>
             <p className="text-sm text-muted-foreground">
               管理 AI 接入、工作时间段与主题偏好，确保分析仪表盘能够获得完整上下文。
             </p>
@@ -430,125 +440,129 @@ export default function SettingsPage() {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <Card className="rounded-3xl border-border/70 bg-card/80 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">核心配置</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                保存后将立即同步到本地引擎，并影响分析仪表盘与规划建议。
-              </p>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form className="grid gap-6" onSubmit={form.handleSubmit(handleSubmit)}>
-                  <FormField
-                    control={form.control}
-                    name="deepseekKey"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>DeepSeek API Key</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="password"
-                            autoComplete="off"
-                            placeholder={
-                              settings?.hasDeepseekKey
-                                ? '重新输入可更新现有密钥'
-                                : '例如：sk-xxxx...'
-                            }
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          仅用于本地调用，不会上传至云端。
-                          {maskedKey ? ` 当前掩码：${maskedKey}` : ''}
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-4">
+            <Card className="rounded-3xl border-border/70 bg-card/80 shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg">核心配置</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  保存后将立即同步到本地引擎，并影响分析仪表盘与规划建议。
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Form {...form}>
+                  <form className="grid gap-6" onSubmit={form.handleSubmit(handleSubmit)}>
                     <FormField
                       control={form.control}
-                      name="workdayStart"
+                      name="deepseekKey"
                       render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>工作日开始时间</FormLabel>
+                        <FormItem data-onboarding="settings-api-key">
+                          <FormLabel>DeepSeek API Key</FormLabel>
                           <FormControl>
-                            <Input type="time" step={60} {...field} />
+                            <Input
+                              type="password"
+                              autoComplete="off"
+                              placeholder={
+                                settings?.hasDeepseekKey
+                                  ? '重新输入可更新现有密钥'
+                                  : '例如：sk-xxxx...'
+                              }
+                              {...field}
+                            />
                           </FormControl>
-                          <FormDescription>影响计划生成与专注建议。</FormDescription>
+                          <FormDescription>
+                            仅用于本地调用，不会上传至云端。
+                            {maskedKey ? ` 当前掩码：${maskedKey}` : ''}
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="workdayStart"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>工作日开始时间</FormLabel>
+                            <FormControl>
+                              <Input type="time" step={60} {...field} />
+                            </FormControl>
+                            <FormDescription>影响计划生成与专注建议。</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="workdayEnd"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>工作日结束时间</FormLabel>
+                            <FormControl>
+                              <Input type="time" step={60} {...field} />
+                            </FormControl>
+                            <FormDescription>需晚于开始时间以获得有效日程。</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
                     <FormField
                       control={form.control}
-                      name="workdayEnd"
+                      name="themePreference"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>工作日结束时间</FormLabel>
+                          <FormLabel>主题偏好</FormLabel>
                           <FormControl>
-                            <Input type="time" step={60} {...field} />
+                            <select
+                              className="h-10 w-full rounded-lg border border-border/60 bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                              value={field.value}
+                              onChange={field.onChange}
+                            >
+                              {THEME_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
                           </FormControl>
-                          <FormDescription>需晚于开始时间以获得有效日程。</FormDescription>
+                          <FormDescription>保存后将立即应用到当前界面。</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  </div>
 
-                  <FormField
-                    control={form.control}
-                    name="themePreference"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>主题偏好</FormLabel>
-                        <FormControl>
-                          <select
-                            className="h-10 w-full rounded-lg border border-border/60 bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                            value={field.value}
-                            onChange={field.onChange}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                        设置保存后自动加载，刷新应用即可回显。
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {settings?.hasDeepseekKey ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleRemoveKey}
+                            disabled={isSaving}
                           >
-                            {THEME_OPTIONS.map((option) => (
-                              <option key={option.value} value={option.value}>
-                                {option.label}
-                              </option>
-                            ))}
-                          </select>
-                        </FormControl>
-                        <FormDescription>保存后将立即应用到当前界面。</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-                      设置保存后自动加载，刷新应用即可回显。
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {settings?.hasDeepseekKey ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={handleRemoveKey}
-                          disabled={isSaving}
-                        >
-                          清除密钥
+                            清除密钥
+                          </Button>
+                        ) : null}
+                        <Button type="submit" disabled={isSaving}>
+                          {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                          保存设置
                         </Button>
-                      ) : null}
-                      <Button type="submit" disabled={isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                        保存设置
-                      </Button>
+                      </div>
                     </div>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
+                  </form>
+                </Form>
+              </CardContent>
+            </Card>
+
+            <DashboardSettingsForm />
+          </div>
 
           <aside className="flex flex-col gap-4">
             <Card className="rounded-3xl border-border/70 bg-card/80 shadow-sm">

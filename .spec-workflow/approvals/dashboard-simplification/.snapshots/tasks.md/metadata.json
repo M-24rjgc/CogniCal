@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/dashboard-simplification/tasks.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-17T10:02:08.583Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760695328489_hlhincj4j",
+      "approvalTitle": "首页仪表盘简化任务分解文档"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-10-17T14:33:46.768Z",
+      "trigger": "approved",
+      "approvalId": "approval_1760711587450_dn3jnqa4t",
+      "approvalTitle": "dashboard-simplification tasks rewrite"
+    }
+  ]
+}

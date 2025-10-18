@@ -25,6 +25,7 @@ import {
   type TimeBlockOverride,
 } from '../../types/planning';
 import { cn } from '../../lib/utils';
+import { HelpPopover } from '../help/HelpPopover';
 
 interface TaskPlanningPanelProps {
   tasks: Task[];
@@ -329,12 +330,18 @@ export function TaskPlanningPanel({
         'flex flex-col gap-6 rounded-3xl border border-border/70 bg-card/80 p-6 shadow-sm',
         className,
       )}
+      data-onboarding="planning-center"
     >
       <header className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Sparkles className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">智能规划中心</h2>
+            <HelpPopover
+              entryId="planning-center"
+              triggerLabel="了解智能规划中心提示"
+              triggerClassName="ml-1"
+            />
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Badge variant={hasEventBridge ? 'secondary' : 'outline'}>

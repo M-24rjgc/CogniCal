@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/interactive-onboarding/design.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-17T20:32:12.216Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760733132136_xr6ea87c1",
+      "approvalTitle": "interactive-onboarding design"
+    }
+  ]
+}

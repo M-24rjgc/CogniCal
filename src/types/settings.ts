@@ -1,3 +1,5 @@
+import type { DashboardConfig } from './dashboard';
+
 export type ThemePreference = 'system' | 'light' | 'dark';
 
 export interface AppSettings {
@@ -8,6 +10,7 @@ export interface AppSettings {
   themePreference: ThemePreference;
   lastUpdatedAt: string | null;
   aiFeedbackOptOut?: boolean;
+  dashboardConfig?: DashboardConfig | null;
 }
 
 export interface UpdateAppSettingsInput {
@@ -17,6 +20,7 @@ export interface UpdateAppSettingsInput {
   workdayEndMinute?: number;
   themePreference?: ThemePreference;
   aiFeedbackOptOut?: boolean;
+  dashboardConfig?: DashboardConfig | null;
 }
 
 export interface AiProviderTelemetry {

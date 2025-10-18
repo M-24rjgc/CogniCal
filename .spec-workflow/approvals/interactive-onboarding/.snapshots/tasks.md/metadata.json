@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/interactive-onboarding/tasks.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-17T20:33:49.009Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760733228925_we3c3k7ca",
+      "approvalTitle": "interactive-onboarding tasks"
+    }
+  ]
+}

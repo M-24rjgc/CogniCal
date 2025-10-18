@@ -8,6 +8,7 @@ import { Button } from '../components/ui/button';
 import type { PlanningOptionView } from '../types/planning';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { HelpPopover } from '../components/help/HelpPopover';
 
 const DATE_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   month: '2-digit',
@@ -121,7 +122,14 @@ export default function CalendarPage() {
                 {hasEventBridge ? '实时同步已开启' : '事件同步未连接'}
               </Badge>
             </div>
-            <h1 className="text-2xl font-semibold text-foreground">规划时间线</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold text-foreground">规划时间线</h1>
+              <HelpPopover
+                entryId="planning-center"
+                triggerLabel="查看规划时间线帮助说明"
+                triggerClassName="ml-1"
+              />
+            </div>
             <p className="text-sm text-muted-foreground">
               查看最新应用的规划时间块，追踪冲突并保持与任务列表同步。
             </p>

@@ -256,9 +256,7 @@ async fn deepseek_parse_task_reports_invalid_json() {
 
     assert_eq!(error.ai_code(), Some(AiErrorCode::InvalidResponse));
     assert!(error.ai_correlation_id().is_some());
-    assert!(error
-        .to_string()
-        .contains("DeepSeek 响应内容非 JSON"));
+    assert!(error.to_string().contains("DeepSeek 响应内容非 JSON"));
 }
 
 #[tokio::test]
@@ -300,13 +298,9 @@ async fn deepseek_parse_task_maps_timeouts_to_http_timeout() {
         context: None,
     };
 
-    let error = parse_task_via_http(
-        &server.base_url(),
-        StdDuration::from_millis(100),
-        request,
-    )
-    .await
-    .expect_err("should timeout");
+    let error = parse_task_via_http(&server.base_url(), StdDuration::from_millis(100), request)
+        .await
+        .expect_err("should timeout");
 
     assert_eq!(error.ai_code(), Some(AiErrorCode::HttpTimeout));
     assert!(error.ai_correlation_id().is_some());

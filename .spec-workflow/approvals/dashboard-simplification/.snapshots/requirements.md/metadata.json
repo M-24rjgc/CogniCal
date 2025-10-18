@@ -1,0 +1,22 @@
+{
+  "filePath": ".spec-workflow/specs/dashboard-simplification/requirements.md",
+  "currentVersion": 2,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-10-17T09:43:32.580Z",
+      "trigger": "initial",
+      "approvalId": "approval_1760694212515_ng46bn5kk",
+      "approvalTitle": "首页仪表盘简化需求文档审批"
+    },
+    {
+      "version": 2,
+      "filename": "snapshot-002.json",
+      "timestamp": "2025-10-17T14:26:33.006Z",
+      "trigger": "approved",
+      "approvalId": "approval_1760710770322_jgwicva5v",
+      "approvalTitle": "dashboard-simplification requirements rewrite"
+    }
+  ]
+}

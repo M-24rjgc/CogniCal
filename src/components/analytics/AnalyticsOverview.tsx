@@ -2,6 +2,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { Card } from '../ui/card';
+import { HelpPopover } from '../help/HelpPopover';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { useProductivityScore } from '../../hooks/useProductivityScore';
 import { SummaryCards } from './SummaryCards';
@@ -81,7 +82,14 @@ export function AnalyticsOverview() {
                 </span>
               ) : null}
             </div>
-            <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">分析仪表盘</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-semibold text-foreground sm:text-4xl">分析仪表盘</h1>
+              <HelpPopover
+                entryId="dashboard-overview"
+                triggerLabel="了解仪表盘模块说明"
+                triggerClassName="ml-1"
+              />
+            </div>
             <p className="max-w-2xl text-sm text-muted-foreground">
               汇总任务完成率、专注时间与效率建议，帮助你在智能规划与任务执行之间形成闭环。
             </p>

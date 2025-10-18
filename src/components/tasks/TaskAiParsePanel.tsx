@@ -13,6 +13,7 @@ import { formatTaskPayloadField } from '../../utils/taskLabels';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Textarea } from '../ui/textarea';
+import { HelpPopover } from '../help/HelpPopover';
 
 interface TaskAiParsePanelProps {
   aiState?: TaskFormAiState;
@@ -150,7 +151,10 @@ export function TaskAiParsePanel({
   }, [aiState]);
 
   return (
-    <section className="space-y-4 rounded-2xl border border-border/80 bg-muted/20 p-4">
+    <section
+      className="space-y-4 rounded-2xl border border-border/80 bg-muted/20 p-4"
+      data-onboarding="ai-parse-panel"
+    >
       <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -167,6 +171,11 @@ export function TaskAiParsePanel({
                 诊断 ID {aiState.correlationId}
               </Badge>
             ) : null}
+            <HelpPopover
+              entryId="tasks-ai-panel"
+              triggerLabel="查看 AI 解析功能说明"
+              triggerClassName="ml-1"
+            />
           </div>
           <p className="text-xs text-muted-foreground">
             输入任务描述，AI 将尝试补全必填字段并提供执行建议。

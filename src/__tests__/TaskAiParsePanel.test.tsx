@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import type { ReactElement } from 'react';
 import { TaskAiParsePanel } from '../components/tasks/TaskAiParsePanel';
 import type { TaskFormAiState } from '../hooks/useTaskForm';
 import type { TaskParseResponse } from '../types/task';
@@ -31,12 +33,16 @@ afterEach(() => {
   scrollIntoViewMock.mockClear();
 });
 
+const renderWithRouter = (ui: ReactElement) => render(<MemoryRouter>{ui}</MemoryRouter>);
+
 describe('TaskAiParsePanel', () => {
   it('calls onParse with trimmed input', async () => {
     const user = userEvent.setup();
     const onParse = vi.fn().mockResolvedValue(undefined);
 
-    render(<TaskAiParsePanel hasDeepseekKey aiState={createAiState()} onParse={onParse} />);
+    renderWithRouter(
+      <TaskAiParsePanel hasDeepseekKey aiState={createAiState()} onParse={onParse} />,
+    );
 
     const textarea = screen.getByPlaceholderText(/请输入任务的自然语言描述/);
     await user.type(textarea, '  编写周报计划  ');
@@ -54,7 +60,9 @@ describe('TaskAiParsePanel', () => {
     const user = userEvent.setup();
     const onParse = vi.fn();
 
-    render(<TaskAiParsePanel hasDeepseekKey={false} aiState={createAiState()} onParse={onParse} />);
+    renderWithRouter(
+      <TaskAiParsePanel hasDeepseekKey={false} aiState={createAiState()} onParse={onParse} />,
+    );
 
     const textarea = screen.getByPlaceholderText(/请输入任务的自然语言描述/);
     await user.type(textarea, '准备 OKR 回顾');
@@ -92,7 +100,7 @@ describe('TaskAiParsePanel', () => {
       lastInput: '编写周报',
     });
 
-    render(<TaskAiParsePanel aiState={aiState} hasDeepseekKey />);
+    renderWithRouter(<TaskAiParsePanel aiState={aiState} hasDeepseekKey />);
 
     expect(screen.getByText('AI 已解析任务描述并回填表单字段。')).toBeInTheDocument();
     expect(screen.getByText('诊断 ID corr-ui-123')).toBeInTheDocument();
@@ -112,7 +120,7 @@ describe('TaskAiParsePanel', () => {
       correlationId: 'err-456',
     });
 
-    render(<TaskAiParsePanel aiState={aiState} hasDeepseekKey />);
+    renderWithRouter(<TaskAiParsePanel aiState={aiState} hasDeepseekKey />);
 
     expect(screen.getByText('AI 解析失败：网络连接超时')).toBeInTheDocument();
     expect(screen.getByText('诊断 ID err-456')).toBeInTheDocument();
@@ -123,7 +131,9 @@ describe('TaskAiParsePanel', () => {
     const user = userEvent.setup();
     const onClear = vi.fn();
 
-    render(<TaskAiParsePanel hasDeepseekKey aiState={createAiState()} onClear={onClear} />);
+    renderWithRouter(
+      <TaskAiParsePanel hasDeepseekKey aiState={createAiState()} onClear={onClear} />,
+    );
 
     const textarea = screen.getByPlaceholderText(/请输入任务的自然语言描述/);
     await user.type(textarea, '清理缓存');

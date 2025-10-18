@@ -1,0 +1,83 @@
+# Tasks Document
+
+- [x] 1. 定义仪表盘配置类型与默认值
+  - File: src/types/dashboard.ts
+  - File: src/utils/dashboardConfig.ts
+  - File: src/types/settings.ts
+  - Purpose: 建立前端仪表盘模块配置的类型安全与默认配置，供后续状态管理与持久化复用。
+  - _Leverage: src/types/task.ts, src/types/settings.ts_
+  - _Requirements: Requirement 2, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Create strong TypeScript types for dashboard modules and config, add default config helpers, and extend AppSettings to include the new config field. Before coding, mark this task as in progress in .spec-workflow/specs/dashboard-simplification/tasks.md; after all changes compile cleanly, mark it complete. | Restrictions: Preserve existing type exports, keep defaults serializable, do not introduce breaking changes to current settings types. | Success: Type generation passes TypeScript checks, defaults cover all modules, AppSettings exposes optional dashboardConfig aligned with backend schema._
+
+- [x] 2. 新增 Tauri API 仪表盘配置接口
+  - File: src/services/tauriApi.ts
+  - Purpose: 暴露 `fetchDashboardConfig` 与 `updateDashboardConfig` 等函数，与 Rust 命令对接并复用统一错误处理。
+  - _Leverage: existing settings API helpers in src/services/tauriApi.ts_
+  - _Requirements: Requirement 2, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Add strongly typed dashboard configuration fetch/update functions to the Tauri API layer, reusing existing error handling helpers. Update tasks.md to in-progress before work starts and mark it complete when the new API functions are tested locally. | Restrictions: Follow existing invoke patterns, ensure return types use DashboardConfig, surface errors via toAppError. | Success: New API calls compile, lint passes, consuming code can import the helpers without additional changes._
+
+- [x] 3. 扩展 settingsStore 并实现 useDashboardConfig hook
+  - File: src/stores/settingsStore.ts
+  - File: src/hooks/useDashboardConfig.ts
+  - Purpose: 在 Zustand store 中添加仪表盘配置状态与操作，并提供封装 hook 处理加载、保存、默认回退逻辑。
+  - _Leverage: existing patterns in src/hooks/useTasks.ts, src/stores/settingsStore.ts_
+  - _Requirements: Requirement 2, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Extend the settings store with dashboardConfig state/actions and expose a dedicated useDashboardConfig hook that handles optimistic updates, error rollback, and default fallbacks. Remember to mark this task as in progress in tasks.md before editing and mark complete only after verifying behavior. | Restrictions: Keep store mutations type-safe, avoid breaking existing settings getters, surface errors through store.error. | Success: Hook returns config, loading flags, toggle/reset helpers; store persists updates via Tauri API; unit tests (or storybook checks) confirm state changes._
+
+- [x] 4. 构建 DashboardSettingsForm 并接入设置页
+  - File: src/components/settings/DashboardSettingsForm.tsx
+  - File: src/pages/Settings.tsx
+  - Purpose: 提供模块开关 UI、恢复默认按钮与实时预览提示，并将其嵌入现有设置页面结构。
+  - _Leverage: existing settings form patterns, src/components/ui/switch.tsx, src/components/ui/checkbox.tsx_
+  - _Requirements: Requirement 2_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Build a DashboardSettingsForm using existing form primitives, wire it to useDashboardConfig, and integrate it into Settings.tsx with proper layout and accessibility. Update tasks.md status before/after coding. | Restrictions: Reuse existing typography/layout utilities, maintain responsive design, do not regress other settings sections. | Success: Users can toggle modules, see pending/save states, reset to defaults, and changes persist across reloads._
+
+- [x] 5. 实现仪表盘基础组件（ModuleContainer 与 QuickActionsBar）
+  - File: src/components/dashboard/ModuleContainer.tsx
+  - File: src/components/dashboard/QuickActionsBar.tsx
+  - Purpose: 为模块渲染提供统一容器、懒加载与错误兜底，并在顶部呈现快捷操作按钮组。
+  - _Leverage: src/components/ui/card.tsx, src/hooks/useTaskForm.ts, existing navigation utilities_
+  - _Requirements: Requirement 1, Requirement 3, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Create ModuleContainer with conditional/lazy rendering and QuickActionsBar with accessible keyboard navigation and responsive layout. Remember to set task status to in progress before editing and mark complete once components pass lint/tests. | Restrictions: Use Suspense/Fallback patterns already adopted in the project, ensure buttons reuse design-system components, avoid duplicating routing logic. | Success: Components render without warnings, support accessibility features, and integrate cleanly with upcoming dashboard refactor._
+
+- [x] 6. 开发核心模块组件（今日任务、到期提醒、生产力评分）
+  - File: src/components/dashboard/TodayTasksOverview.tsx
+  - File: src/components/dashboard/UpcomingTasksAlert.tsx
+  - File: src/components/dashboard/ProductivityScoreCardLite.tsx
+  - Purpose: 提供默认精简视图所需的三个核心模块，含数据拉取、空状态与展开/收起逻辑。
+  - _Leverage: src/hooks/useTasks.ts, src/hooks/useProductivityScore.ts, src/components/ui/alert.tsx_
+  - _Requirements: Requirement 1_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Build the three dashboard modules with proper data hooks, loading/empty states, and progressive disclosure behaviors. Update tasks.md before/after development. | Restrictions: Avoid duplicate queries (reuse existing hooks), ensure time calculations use dayjs utilities, keep components under 200 lines each for maintainability. | Success: Modules display correct data subsets, pass unit snapshot tests, and respect accessibility guidelines._
+
+- [x] 7. 用配置驱动改造 Dashboard 页面
+  - File: src/pages/Dashboard.tsx
+  - File: src/components/dashboard/moduleRegistry.ts
+  - Purpose: 将仪表盘页面替换为根据配置渲染模块的编排层，并注册所有可用模块信息（顺序、懒加载、可见性）。
+  - _Leverage: ModuleContainer, dashboardConfig defaults, existing analytics components_
+  - _Requirements: Requirement 1, Requirement 2, Requirement 3, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Refactor Dashboard.tsx to consume dashboardConfig, render modules via ModuleContainer, and expose a moduleRegistry that maps ids to components/metadata. Mark task status as in progress before coding and complete after validating runtime behavior. | Restrictions: Preserve existing analytics/wellness components, ensure lazy modules load only when enabled, keep page layout responsive. | Success: Dashboard respects user configuration, default view shows three modules + quick actions, toggling settings updates rendered modules without reload._
+
+- [x] 8. 添加仪表盘配置的数据库迁移
+  - File: src-tauri/src/db/migrations.rs
+  - Purpose: 增加新的迁移版本，为 `app_settings` 表写入默认的 `dashboard_config` JSON，并提升 PRAGMA `user_version`。
+  - _Leverage: existing migration helpers ensure_column/execute_batch_
+  - _Requirements: Requirement 2, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Add a new migration step that seeds or updates the dashboard_config entry with default values while keeping migrations idempotent. Update tasks.md statuses accordingly. | Restrictions: Do not break prior migrations, ensure JSON is valid and escapable, log via tracing for observability. | Success: New migration runs cleanly on fresh and existing databases, USER_VERSION increments, default config appears when settings table lacked it._
+
+- [x] 9. 扩展 Rust 设置服务与命令支持仪表盘配置
+  - File: src-tauri/src/models/settings.rs
+  - File: src-tauri/src/services/settings_service.rs
+  - File: src-tauri/src/commands/settings.rs
+  - Purpose: 在 Rust 层加载/更新 `dashboard_config`，提供独立命令与 payload 验证，并保持缓存一致性。
+  - _Leverage: existing SettingsService patterns, serde JSON handling_
+  - _Requirements: Requirement 2, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Extend Rust settings models/service/commands to read/write dashboardConfig, exposing dedicated get/update commands used by the frontend. Update tasks.md before/after coding. | Restrictions: Keep JSON schema validation strict, reuse SettingsRepository for persistence, maintain backwards compatibility with callers that only use legacy fields. | Success: Commands serialize/deserialise DashboardConfig, cache invalidation works, unit tests cover new payload conversions._
+
+- [x] 10. 补充测试覆盖（React 集成 + Playwright + Rust）
+  - File: src/**tests**/dashboard.integration.test.tsx
+  - File: e2e/smoke.e2e.ts
+  - File: src-tauri/src/commands/settings.rs (tests module)
+  - Purpose: 确保配置变更与模块渲染通过单元、集成与端到端测试验证，避免回归。
+  - _Leverage: existing Vitest integration suites, Playwright fixtures, Rust command tests_
+  - _Requirements: Requirement 1, Requirement 2, Requirement 3, Requirement 4_
+  - _Prompt: Implement the task for spec dashboard-simplification, first run spec-workflow-guide to get the workflow guide then implement the task: Add comprehensive tests covering dashboard configuration flows, including React integration tests, Playwright E2E scenario updates, and Rust command unit tests. Update tasks.md status indicators before and after executing tests. | Restrictions: Follow existing test style guides, keep tests deterministic, ensure CI-friendly runtime. | Success: New tests pass locally, fail if configuration persistence/regression occurs, and document the scenarios covered._

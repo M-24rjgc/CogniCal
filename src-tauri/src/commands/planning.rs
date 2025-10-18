@@ -25,7 +25,7 @@ pub async fn planning_generate(
 ) -> CommandResult<PlanningSessionView> {
     let state = state.inner().clone();
     let service = state.planning();
-    
+
     // generate_plan is now async, so we call it directly
     let session = service.generate_plan(payload).await?;
 

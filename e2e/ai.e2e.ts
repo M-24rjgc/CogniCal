@@ -83,6 +83,31 @@ test.describe('AI parse flow', () => {
       };
 
       (globalThis as unknown as { __COGNICAL_E2E__?: typeof bridge }).__COGNICAL_E2E__ = bridge;
+
+      const completedProgress = {
+        state: {
+          progress: {
+            version: 1,
+            hasCompletedTour: true,
+            completedStepIds: [
+              'dashboard-overview',
+              'task-quick-create',
+              'ai-parse-panel',
+              'planning-center',
+              'settings-api-key',
+            ],
+            lastStepId: 'settings-api-key',
+            dismissedAt: null,
+          },
+        },
+        version: 1,
+      } satisfies Record<string, unknown>;
+
+      try {
+        window.localStorage?.setItem('onboarding-store-state', JSON.stringify(completedProgress));
+      } catch (error) {
+        console.warn('[e2e] Failed to preset onboarding store', error);
+      }
     });
   });
 
@@ -126,7 +151,7 @@ test.describe('AI parse flow', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
 
-    const parseButton = dialog.getByRole('button', { name: 'AI 解析' });
+    const parseButton = dialog.getByRole('button', { name: 'AI 解析', exact: true });
     await expect(parseButton).toBeDisabled();
     await expect(dialog.getByText(/未配置 API Key/)).toBeVisible();
     await expect(dialog.getByText(/请前往设置页面完成配置/)).toBeVisible();
@@ -138,7 +163,7 @@ test.describe('AI parse flow', () => {
     await page.waitForURL('**/#/settings');
     await expect(page.getByRole('heading', { name: '应用设置中心' })).toBeVisible();
 
-    const keyField = page.getByLabel('DeepSeek API Key');
+    const keyField = page.getByRole('textbox', { name: 'DeepSeek API Key', exact: true });
     await keyField.fill('sk-test-123456789');
     await page.getByRole('button', { name: '保存设置' }).click();
     await expect(page.getByRole('button', { name: '清除密钥' })).toBeVisible();
@@ -171,7 +196,10 @@ test.describe('AI parse flow', () => {
     const textarea = activeDialog.getByPlaceholder(/请输入任务的自然语言描述/);
     await textarea.fill('编写季度总结报告并安排复盘会议');
 
-    const actionableParseButton = activeDialog.getByRole('button', { name: 'AI 解析' });
+    const actionableParseButton = activeDialog.getByRole('button', {
+      name: 'AI 解析',
+      exact: true,
+    });
     await expect(actionableParseButton).toBeEnabled();
     await actionableParseButton.click();
 

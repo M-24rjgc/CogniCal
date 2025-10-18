@@ -54,6 +54,12 @@ import {
   type ThemePreference,
   type UpdateAppSettingsInput,
 } from '../types/settings';
+import {
+  DASHBOARD_MODULE_IDS,
+  type DashboardConfig,
+  type DashboardConfigInput,
+} from '../types/dashboard';
+import { DEFAULT_DASHBOARD_CONFIG, normalizeDashboardConfig } from '../utils/dashboardConfig';
 
 type CommandErrorPayload = {
   code: string;
@@ -244,6 +250,8 @@ const COMMANDS = {
   ANALYTICS_REPORT_EXPORT: 'analytics_report_export',
   SETTINGS_GET: 'settings_get',
   SETTINGS_UPDATE: 'settings_update',
+  DASHBOARD_CONFIG_GET: 'dashboard_config_get',
+  DASHBOARD_CONFIG_UPDATE: 'dashboard_config_update',
   CACHE_CLEAR_ALL: 'cache_clear_all',
 } as const;
 
@@ -324,6 +332,7 @@ type InternalAppSettings = {
   themePreference: ThemePreference;
   lastUpdatedAt: string | null;
   aiFeedbackOptOut?: boolean;
+  dashboardConfig: DashboardConfig;
 };
 
 const createDefaultAppSettings = (): InternalAppSettings => ({
@@ -333,6 +342,7 @@ const createDefaultAppSettings = (): InternalAppSettings => ({
   themePreference: 'system',
   lastUpdatedAt: null,
   aiFeedbackOptOut: false,
+  dashboardConfig: normalizeDashboardConfig(DEFAULT_DASHBOARD_CONFIG),
 });
 
 const memoryStore: {
@@ -689,6 +699,7 @@ const normalizeInternalSettings = (settings: InternalAppSettings): AppSettings =
   const startMinute = clampMinute(settings.workdayStartMinute, 9 * 60);
   const endMinute = clampMinute(settings.workdayEndMinute, Math.min(18 * 60, startMinute + 8 * 60));
   const normalizedEndMinute = ensureValidEndMinute(startMinute, endMinute);
+  const dashboardConfig = normalizeDashboardConfig(settings.dashboardConfig);
 
   const theme: ThemePreference =
     settings.themePreference === 'light' || settings.themePreference === 'dark'
@@ -703,6 +714,7 @@ const normalizeInternalSettings = (settings: InternalAppSettings): AppSettings =
     themePreference: theme,
     lastUpdatedAt: settings.lastUpdatedAt ?? null,
     aiFeedbackOptOut: settings.aiFeedbackOptOut ?? false,
+    dashboardConfig,
   } satisfies AppSettings;
 };
 
@@ -762,6 +774,14 @@ const normalizeAppSettingsResponse = (payload: unknown): AppSettings => {
       ? input.aiFeedbackOptOut
       : fallback.aiFeedbackOptOut;
 
+  const dashboardConfigPayload =
+    'dashboardConfig' in input
+      ? (input.dashboardConfig as DashboardConfig | DashboardConfigInput | null | undefined)
+      : fallback.dashboardConfig;
+  const normalizedDashboardConfig = normalizeDashboardConfig(
+    dashboardConfigPayload ?? fallback.dashboardConfig,
+  );
+
   memoryStore.settings = {
     deepseekApiKey: hasKey
       ? typeof input.deepseekApiKey === 'string'
@@ -773,6 +793,7 @@ const normalizeAppSettingsResponse = (payload: unknown): AppSettings => {
     themePreference,
     lastUpdatedAt,
     aiFeedbackOptOut,
+    dashboardConfig: normalizedDashboardConfig,
   } satisfies InternalAppSettings;
 
   return {
@@ -783,6 +804,7 @@ const normalizeAppSettingsResponse = (payload: unknown): AppSettings => {
     themePreference,
     lastUpdatedAt,
     aiFeedbackOptOut,
+    dashboardConfig: normalizedDashboardConfig,
   } satisfies AppSettings;
 };
 
@@ -1207,6 +1229,62 @@ const removeUndefinedDeep = <T>(value: T): T => {
   return value;
 };
 
+const sanitizeDashboardConfigInput = (
+  input: DashboardConfigInput | null | undefined,
+): DashboardConfigInput => {
+  if (!input || typeof input !== 'object') {
+    return {};
+  }
+
+  const sanitized: DashboardConfigInput = {};
+
+  if (input.modules && typeof input.modules === 'object') {
+    let overrides: DashboardConfigInput['modules'] | undefined;
+    for (const id of DASHBOARD_MODULE_IDS) {
+      const override = input.modules[id];
+      if (typeof override === 'boolean') {
+        if (!overrides) {
+          overrides = {};
+        }
+        overrides[id] = override;
+      }
+    }
+    if (overrides) {
+      sanitized.modules = overrides;
+    }
+  }
+
+  if (typeof input.lastUpdatedAt === 'string' || input.lastUpdatedAt === null) {
+    sanitized.lastUpdatedAt = input.lastUpdatedAt;
+  }
+
+  return sanitized;
+};
+
+const mergeDashboardConfig = (
+  current: DashboardConfig,
+  patch: DashboardConfigInput | null | undefined,
+): DashboardConfig => {
+  const sanitized = sanitizeDashboardConfigInput(patch);
+  const modules = { ...current.modules };
+
+  if (sanitized.modules) {
+    for (const id of DASHBOARD_MODULE_IDS) {
+      if (sanitized.modules[id] !== undefined) {
+        modules[id] = sanitized.modules[id] as boolean;
+      }
+    }
+  }
+
+  const timestamp =
+    sanitized.lastUpdatedAt === undefined ? new Date().toISOString() : sanitized.lastUpdatedAt;
+
+  return normalizeDashboardConfig({
+    modules,
+    lastUpdatedAt: timestamp,
+  });
+};
+
 const applyFilters = (tasks: Task[], filters: TaskFilters): Task[] => {
   let filtered = [...tasks];
 
@@ -1479,6 +1557,23 @@ const invokeOrMock = async <T>(command: string, payload?: Record<string, unknown
       next.lastUpdatedAt = new Date().toISOString();
       memoryStore.settings = next;
       return normalizeInternalSettings(next) as T;
+    }
+    case COMMANDS.DASHBOARD_CONFIG_GET: {
+      const settings = ensureAppSettings();
+      return deepClone(settings.dashboardConfig) as T;
+    }
+    case COMMANDS.DASHBOARD_CONFIG_UPDATE: {
+      const patch = (sanitizedPayload?.payload ?? sanitizedPayload) as
+        | DashboardConfigInput
+        | null
+        | undefined;
+      const settings = ensureAppSettings();
+      const nextConfig = mergeDashboardConfig(settings.dashboardConfig, patch);
+      memoryStore.settings = {
+        ...settings,
+        dashboardConfig: nextConfig,
+      } satisfies InternalAppSettings;
+      return deepClone(nextConfig) as T;
     }
     case COMMANDS.LIST: {
       const parsedFilters = filters ?? { page: 1, pageSize: DEFAULT_PAGE_SIZE };
@@ -2048,6 +2143,46 @@ export const fetchAnalyticsOverview = async (
     return normalized;
   } catch (error) {
     throw toAppError(error, '获取分析概览失败');
+  }
+};
+
+export const fetchDashboardConfig = async (): Promise<DashboardConfig> => {
+  try {
+    const response = await invokeOrMock<unknown>(COMMANDS.DASHBOARD_CONFIG_GET, undefined);
+    const normalized = normalizeDashboardConfig(
+      (response ?? undefined) as DashboardConfig | DashboardConfigInput | null | undefined,
+    );
+    const current = ensureAppSettings();
+    memoryStore.settings = {
+      ...current,
+      dashboardConfig: normalized,
+    } satisfies InternalAppSettings;
+    return normalized;
+  } catch (error) {
+    throw toAppError(error, '加载仪表盘配置失败');
+  }
+};
+
+export const updateDashboardConfig = async (
+  payload: DashboardConfigInput,
+): Promise<DashboardConfig> => {
+  try {
+    const sanitizedPayload = sanitizeDashboardConfigInput(payload);
+    const normalizedPayload = removeUndefinedDeep(sanitizedPayload) as Record<string, unknown>;
+    const response = await invokeOrMock<unknown>(COMMANDS.DASHBOARD_CONFIG_UPDATE, {
+      payload: normalizedPayload,
+    });
+    const normalized = normalizeDashboardConfig(
+      (response ?? undefined) as DashboardConfig | DashboardConfigInput | null | undefined,
+    );
+    const current = ensureAppSettings();
+    memoryStore.settings = {
+      ...current,
+      dashboardConfig: normalized,
+    } satisfies InternalAppSettings;
+    return normalized;
+  } catch (error) {
+    throw toAppError(error, '更新仪表盘配置失败');
   }
 };
 

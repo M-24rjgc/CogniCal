@@ -134,7 +134,7 @@ impl PlanningService {
 
         let conn = self.db.get_connection()?;
         let has_ai_key = self.ai_service.has_configured_provider(&conn)?;
-        
+
         // 强制要求 API Key - 不提供低质量的本地回退
         if !has_ai_key {
             return Err(AppError::validation(
@@ -158,7 +158,7 @@ impl PlanningService {
             .as_deref()
             .unwrap_or(DEFAULT_PREFERENCE_ID)
             .to_string();
-        
+
         // Load preferences and close connection before async call
         let preference_snapshot = {
             let behavior = BehaviorLearningService::new(&conn);
@@ -171,14 +171,21 @@ impl PlanningService {
         // Clone data needed for AI call (so we can drop conn)
         let tasks_for_ai = tasks.clone();
         let constraints_for_ai = constraints.clone();
-        
+
         // Drop connection before async operations
         drop(conn);
 
         // 使用 DeepSeek AI 生成智能规划（不再提供低质量回退）
-        let options = self.generate_with_ai(&tasks_for_ai, &constraints_for_ai, &scheduling_preferences, &preference_snapshot).await?;
+        let options = self
+            .generate_with_ai(
+                &tasks_for_ai,
+                &constraints_for_ai,
+                &scheduling_preferences,
+                &preference_snapshot,
+            )
+            .await?;
         info!(target: "app::planning", "Successfully generated plan options using DeepSeek AI");
-        
+
         // Reconnect for database operations
         let mut conn = self.db.get_connection()?;
 
@@ -501,7 +508,7 @@ impl PlanningService {
         _tasks: &[TaskRecord],
     ) -> AppResult<Vec<PlanOption>> {
         let mut options = Vec::new();
-        
+
         // For now, create a single option from the AI response
         // In the future, we could request multiple alternatives from AI
         let mut blocks = Vec::new();
@@ -531,10 +538,7 @@ impl PlanningService {
                 .and_then(|v| v.as_f64())
                 .unwrap_or(0.75) as f32;
 
-            let notes = item
-                .get("notes")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let notes = item.get("notes").and_then(|v| v.as_str()).unwrap_or("");
 
             blocks.push(TimeBlockCandidate {
                 id: Uuid::new_v4().to_string(),
@@ -574,7 +578,10 @@ impl PlanningService {
             risk_notes: if conflicts.is_empty() {
                 vec!["AI 生成的智能规划方案，已优化任务时间分配".to_string()]
             } else {
-                vec![format!("检测到 {} 个潜在冲突，可通过调整时间解决", conflicts.len())]
+                vec![format!(
+                    "检测到 {} 个潜在冲突，可通过调整时间解决",
+                    conflicts.len()
+                )]
             },
         };
 

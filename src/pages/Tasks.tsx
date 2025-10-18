@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { BarChart3, Plus, RefreshCcw, Search } from 'lucide-react';
 import { TaskDetailsDrawer } from '../components/tasks/TaskDetailsDrawer';
 import { TaskFormDialog } from '../components/tasks/TaskFormDialog';
@@ -11,6 +11,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useTaskForm, type TaskFormValues } from '../hooks/useTaskForm';
 import { useTasks } from '../hooks/useTasks';
+import { FOCUS_SEARCH_EVENT_NAME } from '../hooks/useKeyboardShortcuts';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import type { Task, TaskAISource, TaskStatus } from '../types/task';
@@ -28,6 +29,8 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 export default function TasksPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
     tasks,
     filters,
@@ -59,6 +62,8 @@ export default function TasksPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [planningTaskIds, setPlanningTaskIds] = useState<string[]>([]);
+  const planningPanelRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const { form, resetForm, setFromTask, aiState, triggerAiParse, clearAiState } = useTaskForm();
 
@@ -198,6 +203,42 @@ export default function TasksPage() {
     [selectTask],
   );
 
+  const focusSearchInput = useCallback(() => {
+    const node = searchInputRef.current;
+    if (node) {
+      node.focus();
+      node.select();
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFocusSearch = () => {
+      focusSearchInput();
+    };
+    window.addEventListener(FOCUS_SEARCH_EVENT_NAME, handleFocusSearch);
+    return () => {
+      window.removeEventListener(FOCUS_SEARCH_EVENT_NAME, handleFocusSearch);
+    };
+  }, [focusSearchInput]);
+
+  useEffect(() => {
+    const state = location.state as { intent?: string } | null;
+    if (!state?.intent) {
+      return;
+    }
+
+    if (state.intent === 'create-task') {
+      openCreateDialog();
+    } else if (state.intent === 'open-planning') {
+      planningPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      pushToast({ title: '已定位至智能规划中心', variant: 'default', duration: 2500 });
+    } else if (state.intent === 'focus-search') {
+      focusSearchInput();
+    }
+
+    navigate(location.pathname, { replace: true });
+  }, [focusSearchInput, location, navigate, openCreateDialog]);
+
   const handlePlanningSelectionChange = useCallback((nextIds: string[]) => {
     setPlanningTaskIds(nextIds);
   }, []);
@@ -314,7 +355,12 @@ export default function TasksPage() {
             >
               <RefreshCcw className="mr-2 h-4 w-4" /> 刷新
             </Button>
-            <Button type="button" onClick={openCreateDialog} disabled={isMutating}>
+            <Button
+              type="button"
+              onClick={openCreateDialog}
+              disabled={isMutating}
+              data-onboarding="task-quick-create"
+            >
               <Plus className="mr-2 h-4 w-4" /> 新建任务
             </Button>
           </div>
@@ -331,6 +377,7 @@ export default function TasksPage() {
               placeholder="搜索标题或描述"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
+              ref={searchInputRef}
             />
           </div>
 
@@ -461,13 +508,15 @@ export default function TasksPage() {
         onPlanTask={handlePlanTask}
       />
 
-      <TaskPlanningPanel
-        tasks={tasks}
-        selectedTaskId={selectedTaskId ?? undefined}
-        selectedTaskIds={planningTaskIds}
-        onSelectionChange={handlePlanningSelectionChange}
-        onPlanApplied={() => void fetchTasks(filters)}
-      />
+      <div ref={planningPanelRef}>
+        <TaskPlanningPanel
+          tasks={tasks}
+          selectedTaskId={selectedTaskId ?? undefined}
+          selectedTaskIds={planningTaskIds}
+          onSelectionChange={handlePlanningSelectionChange}
+          onPlanApplied={() => void fetchTasks(filters)}
+        />
+      </div>
 
       <TaskFormDialog
         open={isFormOpen}

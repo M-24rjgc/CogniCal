@@ -6,10 +6,12 @@ import { cn } from '../../lib/utils';
 export interface SidebarItem {
   key: string;
   label: string;
-  to: string;
   icon: LucideIcon;
+  to?: string;
+  onSelect?: () => void;
   description?: string;
   badge?: string;
+  isActive?: boolean;
 }
 
 interface SidebarProps {
@@ -43,19 +45,13 @@ export function Sidebar({ items, footer, onNavigate, onClose }: SidebarProps) {
       <nav className="flex flex-1 flex-col gap-1" aria-label="主导航">
         {items.map((item) => {
           const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.key}
-              to={item.to}
-              end={item.to === '/'}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground',
-                  isActive && 'bg-muted/90 text-foreground shadow-sm',
-                )
-              }
-            >
+          const isActive = Boolean(item.isActive);
+          const baseClasses =
+            'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground';
+          const activeClasses = 'bg-muted/90 text-foreground shadow-sm';
+
+          const content = (
+            <>
               <Icon className="h-4 w-4 text-primary transition group-hover:text-primary/80" />
               <span className="flex-1">{item.label}</span>
               {item.badge ? (
@@ -63,7 +59,43 @@ export function Sidebar({ items, footer, onNavigate, onClose }: SidebarProps) {
                   {item.badge}
                 </span>
               ) : null}
-            </NavLink>
+            </>
+          );
+
+          if (item.to) {
+            return (
+              <NavLink
+                key={item.key}
+                to={item.to}
+                end={item.to === '/'}
+                onClick={(event) => {
+                  if (item.onSelect) {
+                    event.preventDefault();
+                    item.onSelect();
+                  }
+                  onNavigate?.();
+                }}
+                className={({ isActive: routeActive }) =>
+                  cn(baseClasses, (routeActive || isActive) && activeClasses)
+                }
+              >
+                {content}
+              </NavLink>
+            );
+          }
+
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => {
+                item.onSelect?.();
+                onNavigate?.();
+              }}
+              className={cn(baseClasses, isActive && activeClasses)}
+            >
+              {content}
+            </button>
           );
         })}
       </nav>

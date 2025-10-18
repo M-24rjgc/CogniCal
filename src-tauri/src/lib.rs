@@ -68,6 +68,8 @@ fn try_run() -> Result<(), Box<dyn std::error::Error>> {
             crate::commands::settings::settings_get,
             crate::commands::settings::settings_update,
             crate::commands::settings::settings_clear_api_key,
+            crate::commands::settings::dashboard_config_get,
+            crate::commands::settings::dashboard_config_update,
             crate::commands::cache::cache_clear_all,
             crate::commands::wellness::wellness_check_nudge,
             crate::commands::wellness::wellness_get_pending,

@@ -7,53 +7,63 @@
 ### ✅ 已纳入版本控制的内容
 
 #### 源代码
+
 - 所有 TypeScript/JavaScript 源文件 (`src/**`)
 - Rust 后端代码 (`src-tauri/src/**`)
 - 测试文件 (`src/__tests__/**`, `e2e/**`, `src-tauri/tests/**`)
 
 #### 配置文件
+
 - 项目配置: `package.json`, `tsconfig.json`, `vite.config.ts`, 等
 - 工具配置: `.eslintrc.*`, `.prettierrc`, `.lintstagedrc.json`
 - Tauri 配置: `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`
 - Git 配置: `.gitignore`, `.gitattributes`
 
 #### 文档
+
 - 项目文档: `README.md`, `CHANGELOG.md`, `CogniCal.md`
 - 开发文档: 所有 `.md` 文件（包括问题跟踪和实现摘要）
 - 规范文档: `.spec-workflow/` 目录（工作流模板和归档）
 
 #### 资源文件
+
 - 图标和静态资源: `public/**`, `src-tauri/icons/**`
 - 数据库架构: `src-tauri/src/db/schema.sql`
 
 #### 开发工具
+
 - Husky Git hooks: `.husky/**`
 - VS Code 推荐配置: `.vscode/**`
 
 ### ❌ 已忽略的内容
 
 #### 依赖和构建产物
+
 - `node_modules/` - Node.js 依赖包
 - `dist/`, `dist-ssr/` - 前端构建输出
 - `src-tauri/target/` - Rust 编译输出
 - `.pnpm-store/` - pnpm 缓存
 
 #### 临时和生成文件
+
 - `test-results/`, `playwright-report/` - 测试结果
 - `*.log` - 日志文件
 - `.venv/` - Python 虚拟环境
 
 #### IDE 和系统文件
+
 - `.DS_Store` - macOS 系统文件
 - `Thumbs.db`, `Desktop.ini` - Windows 系统文件
 - `.kilocode/` - IDE 配置
 
 #### 敏感信息
+
 - `.env*` - 环境变量文件（可能包含 API 密钥）
 
 ## 🚀 常用 Git 命令
 
 ### 查看状态
+
 ```powershell
 git status              # 查看当前状态
 git status --short      # 简短格式
@@ -61,6 +71,7 @@ git log --oneline -10   # 查看最近 10 条提交记录
 ```
 
 ### 提交更改
+
 ```powershell
 # 添加文件到暂存区
 git add .                           # 添加所有更改
@@ -73,6 +84,7 @@ git commit -m "docs: 更新文档"
 ```
 
 ### 分支管理
+
 ```powershell
 # 创建和切换分支
 git branch feature/new-feature      # 创建新分支
@@ -88,6 +100,7 @@ git branch -d feature/new-feature   # 删除已合并的分支
 ```
 
 ### 远程仓库
+
 ```powershell
 # 添加远程仓库
 git remote add origin <远程仓库URL>
@@ -115,6 +128,7 @@ git pull origin master
 - `ci:` - CI/CD 配置更改
 
 示例：
+
 ```
 feat: 添加任务智能解析面板
 fix: 修复日期选择器的边界情况
@@ -125,6 +139,7 @@ refactor: 优化数据库查询性能
 ## 🔄 工作流建议
 
 ### 开发新功能
+
 ```powershell
 # 1. 创建功能分支
 git checkout -b feature/ai-enhancement
@@ -142,6 +157,7 @@ git branch -d feature/ai-enhancement
 ```
 
 ### 修复 Bug
+
 ```powershell
 # 1. 创建修复分支
 git checkout -b fix/task-parsing-error
@@ -161,6 +177,7 @@ git branch -d fix/task-parsing-error
 ## 🛡️ .gitattributes 说明
 
 项目已配置 `.gitattributes` 来确保跨平台一致性：
+
 - 所有文本文件使用 LF 行尾（Unix 风格）
 - 二进制文件（图片、字体等）正确标记
 - Git 会自动处理 Windows (CRLF) 和 Unix (LF) 之间的转换

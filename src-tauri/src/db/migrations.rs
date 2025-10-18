@@ -2,8 +2,10 @@ use rusqlite::{Connection, Row};
 use tracing::info;
 
 use crate::error::AppResult;
+use crate::models::settings::DashboardConfig;
 
-const USER_VERSION: i32 = 5;
+const USER_VERSION: i32 = 6;
+const KEY_DASHBOARD_CONFIG: &str = "dashboard_config";
 
 pub fn run(conn: &Connection) -> AppResult<()> {
     let mut current_version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
@@ -40,6 +42,13 @@ pub fn run(conn: &Connection) -> AppResult<()> {
         info!(target: "app::db", version = current_version, "running migration v5");
         migrate_to_v5(conn)?;
         current_version = 5;
+        conn.execute(&format!("PRAGMA user_version = {}", current_version), [])?;
+    }
+
+    if current_version < 6 {
+        info!(target: "app::db", version = current_version, "running migration v6");
+        migrate_to_v6(conn)?;
+        current_version = 6;
         conn.execute(&format!("PRAGMA user_version = {}", current_version), [])?;
     }
 
@@ -328,6 +337,20 @@ fn migrate_to_v5(conn: &Connection) -> AppResult<()> {
         CREATE INDEX IF NOT EXISTS idx_ai_cache_expires_at
             ON ai_cache(expires_at);
         "#,
+    )?;
+
+    Ok(())
+}
+
+fn migrate_to_v6(conn: &Connection) -> AppResult<()> {
+    let default_value = serde_json::to_string(&DashboardConfig::default())?;
+    conn.execute(
+        r#"
+        INSERT INTO app_settings (key, value, updated_at)
+        VALUES (?1, ?2, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO NOTHING
+        "#,
+        (KEY_DASHBOARD_CONFIG, default_value.as_str()),
     )?;
 
     Ok(())

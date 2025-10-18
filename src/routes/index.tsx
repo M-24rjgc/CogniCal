@@ -1,17 +1,31 @@
 import {
   CalendarDays,
   CheckSquare,
+  HelpCircle,
   KeyRound,
   LayoutDashboard,
   Loader2,
   Settings2,
 } from 'lucide-react';
-import { Outlet, createHashRouter, Navigate, Link } from 'react-router-dom';
-import { useEffect, useMemo, useRef } from 'react';
+import {
+  Link,
+  Navigate,
+  Outlet,
+  createHashRouter,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
+import CommandPalette, { type CommandPaletteItem } from '../components/keyboard/CommandPalette';
+import KeyboardShortcutsHelp, {
+  type ShortcutGroup,
+} from '../components/keyboard/KeyboardShortcutsHelp';
 import { AppShell } from '../components/layout/AppShell';
 import type { SidebarItem } from '../components/layout/Sidebar';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
+import { FOCUS_SEARCH_EVENT_NAME, KeyboardShortcutContext } from '../hooks/useKeyboardShortcuts';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useTheme, type ThemeMode } from '../providers/theme-provider';
@@ -19,22 +33,322 @@ import CalendarPage from '../pages/Calendar';
 import DashboardPage from '../pages/Dashboard';
 import SettingsPage from '../pages/Settings';
 import TasksPage from '../pages/Tasks';
+import { HelpCenterDialog } from '../components/help/HelpCenterDialog';
+import OnboardingOrchestrator from '../components/onboarding/OnboardingOrchestrator';
 
 function RootLayout() {
-  const navItems: SidebarItem[] = useMemo(
-    () => [
-      { key: 'dashboard', label: '仪表盘', to: '/', icon: LayoutDashboard },
-      { key: 'tasks', label: '任务', to: '/tasks', icon: CheckSquare },
-      { key: 'calendar', label: '日历', to: '/calendar', icon: CalendarDays },
-      { key: 'settings', label: '设置', to: '/settings', icon: Settings2 },
-    ],
-    [],
-  );
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const settings = useSettingsStore((state) => state.settings);
   const isSettingsLoading = useSettingsStore((state) => state.isLoading);
   const loadSettings = useSettingsStore((state) => state.loadSettings);
-  const { setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
+
+  const [isCommandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [isShortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [isHelpCenterOpen, setHelpCenterOpen] = useState(false);
+
+  const goSequenceRef = useRef(false);
+  const goTimeoutRef = useRef<number | null>(null);
+
+  const startGoSequence = useCallback(() => {
+    goSequenceRef.current = true;
+    if (goTimeoutRef.current !== null) {
+      window.clearTimeout(goTimeoutRef.current);
+    }
+    goTimeoutRef.current = window.setTimeout(() => {
+      goSequenceRef.current = false;
+      goTimeoutRef.current = null;
+    }, 1200);
+  }, []);
+
+  const consumeGoSequence = useCallback(() => {
+    if (!goSequenceRef.current) {
+      return false;
+    }
+    goSequenceRef.current = false;
+    if (goTimeoutRef.current !== null) {
+      window.clearTimeout(goTimeoutRef.current);
+      goTimeoutRef.current = null;
+    }
+    return true;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (goTimeoutRef.current !== null) {
+        window.clearTimeout(goTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const openCommandPalette = useCallback(() => setCommandPaletteOpen(true), []);
+  const closeCommandPalette = useCallback(() => setCommandPaletteOpen(false), []);
+  const toggleCommandPalette = useCallback(() => setCommandPaletteOpen((prev) => !prev), []);
+  const openShortcutHelp = useCallback(() => setShortcutHelpOpen(true), []);
+  const closeShortcutHelp = useCallback(() => setShortcutHelpOpen(false), []);
+  const openHelpCenter = useCallback(() => setHelpCenterOpen(true), []);
+  const closeHelpCenter = useCallback(() => setHelpCenterOpen(false), []);
+
+  const triggerFocusSearch = useCallback(() => {
+    window.dispatchEvent(new Event(FOCUS_SEARCH_EVENT_NAME));
+  }, []);
+
+  const shortcutContextValue = useMemo(
+    () => ({
+      isCommandPaletteOpen,
+      openCommandPalette,
+      closeCommandPalette,
+      toggleCommandPalette,
+      isShortcutHelpOpen,
+      openShortcutHelp,
+      closeShortcutHelp,
+      isHelpCenterOpen,
+      openHelpCenter,
+      closeHelpCenter,
+      triggerFocusSearch,
+    }),
+    [
+      closeCommandPalette,
+      closeHelpCenter,
+      closeShortcutHelp,
+      isCommandPaletteOpen,
+      isHelpCenterOpen,
+      isShortcutHelpOpen,
+      openCommandPalette,
+      openHelpCenter,
+      openShortcutHelp,
+      toggleCommandPalette,
+      triggerFocusSearch,
+    ],
+  );
+
+  const navigateWithReplace = useCallback(
+    (path: string) => {
+      navigate(path, { replace: false });
+    },
+    [navigate],
+  );
+
+  const navigateToSettingsFromHelp = useCallback(() => {
+    closeHelpCenter();
+    navigateWithReplace('/settings');
+  }, [closeHelpCenter, navigateWithReplace]);
+
+  const focusTaskSearch = useCallback(() => {
+    if (location.pathname.startsWith('/tasks')) {
+      triggerFocusSearch();
+    } else {
+      navigate('/tasks', { state: { intent: 'focus-search' } });
+    }
+  }, [location.pathname, navigate, triggerFocusSearch]);
+
+  const handleCreateTask = useCallback(() => {
+    navigate('/tasks', { state: { intent: 'create-task' } });
+  }, [navigate]);
+
+  const handleOpenPlanning = useCallback(() => {
+    navigate('/tasks', { state: { intent: 'open-planning' } });
+  }, [navigate]);
+
+  const getNextTheme = useCallback((): ThemeMode => {
+    const modes: ThemeMode[] = ['light', 'dark', 'system'];
+    const currentIndex = Math.max(0, modes.indexOf(theme));
+    return modes[(currentIndex + 1) % modes.length];
+  }, [theme]);
+
+  const handleCycleTheme = useCallback(() => {
+    setTheme(getNextTheme());
+  }, [getNextTheme, setTheme]);
+
+  const isOverlayOpen = isCommandPaletteOpen || isShortcutHelpOpen || isHelpCenterOpen;
+
+  const isEditableElement = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    if (target.isContentEditable) return true;
+    const tag = target.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+  };
+
+  useHotkeys(
+    'ctrl+k,meta+k',
+    (event) => {
+      event.preventDefault();
+      toggleCommandPalette();
+    },
+    [toggleCommandPalette],
+  );
+
+  useHotkeys(
+    'ctrl+shift+p,meta+shift+p',
+    (event) => {
+      event.preventDefault();
+      openCommandPalette();
+    },
+    [openCommandPalette],
+  );
+
+  useHotkeys(
+    'ctrl+n,meta+n',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      handleCreateTask();
+    },
+    [handleCreateTask, isOverlayOpen],
+  );
+
+  useHotkeys(
+    'ctrl+comma,meta+comma',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      navigateWithReplace('/settings');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
+    'shift+/',
+    (event) => {
+      if (isEditableElement(event.target)) return;
+      if (isOverlayOpen && !isHelpCenterOpen) {
+        event.preventDefault();
+        return;
+      }
+      event.preventDefault();
+      if (isHelpCenterOpen) {
+        closeHelpCenter();
+      } else {
+        openHelpCenter();
+      }
+    },
+    [closeHelpCenter, isHelpCenterOpen, isOverlayOpen, openHelpCenter],
+  );
+
+  useHotkeys(
+    '/',
+    (event) => {
+      if (isOverlayOpen) return;
+      if (isEditableElement(event.target)) return;
+      event.preventDefault();
+      focusTaskSearch();
+    },
+    [focusTaskSearch, isOverlayOpen],
+  );
+
+  useHotkeys(
+    'ctrl+1,meta+1',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      navigateWithReplace('/');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
+    'ctrl+2,meta+2',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      navigateWithReplace('/tasks');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
+    'ctrl+3,meta+3',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      navigateWithReplace('/calendar');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
+    'ctrl+shift+l,meta+shift+l',
+    (event) => {
+      if (isEditableElement(event.target)) return;
+      event.preventDefault();
+      handleCycleTheme();
+    },
+    [handleCycleTheme],
+  );
+
+  useHotkeys(
+    'esc',
+    (event) => {
+      if (goSequenceRef.current) {
+        consumeGoSequence();
+      }
+      if (!isOverlayOpen) return;
+      event.preventDefault();
+      if (isCommandPaletteOpen) {
+        closeCommandPalette();
+      } else if (isShortcutHelpOpen) {
+        closeShortcutHelp();
+      } else if (isHelpCenterOpen) {
+        closeHelpCenter();
+      }
+    },
+    [
+      closeCommandPalette,
+      closeHelpCenter,
+      closeShortcutHelp,
+      consumeGoSequence,
+      isCommandPaletteOpen,
+      isHelpCenterOpen,
+      isOverlayOpen,
+      isShortcutHelpOpen,
+    ],
+  );
+
+  useHotkeys(
+    'g',
+    (event) => {
+      if (isOverlayOpen) return;
+      if (isEditableElement(event.target)) return;
+      startGoSequence();
+      event.preventDefault();
+    },
+    [isOverlayOpen, startGoSequence],
+  );
+
+  useHotkeys(
+    'd,t,c,s,p,h',
+    (event) => {
+      if (isOverlayOpen) return;
+      if (!consumeGoSequence()) return;
+      event.preventDefault();
+      const key = event.key.toLowerCase();
+      switch (key) {
+        case 'd':
+          navigateWithReplace('/');
+          break;
+        case 't':
+          navigateWithReplace('/tasks');
+          break;
+        case 'c':
+          navigateWithReplace('/calendar');
+          break;
+        case 's':
+          navigateWithReplace('/settings');
+          break;
+        case 'p':
+          handleOpenPlanning();
+          break;
+        case 'h':
+          openHelpCenter();
+          break;
+        default:
+          break;
+      }
+    },
+    [consumeGoSequence, handleOpenPlanning, isOverlayOpen, navigateWithReplace, openHelpCenter],
+  );
 
   const requestRef = useRef(false);
   const hasAttemptedRef = useRef(false);
@@ -130,15 +444,230 @@ function RootLayout() {
     </div>
   );
 
+  const commandPaletteItems = useMemo<CommandPaletteItem[]>(
+    () => [
+      {
+        id: 'navigate-dashboard',
+        label: '前往仪表盘',
+        description: '查看实时效率洞察与任务总览',
+        category: '导航',
+        shortcut: 'Ctrl + 1',
+        keywords: ['dashboard', '首页', '仪表盘'],
+        action: () => navigateWithReplace('/'),
+      },
+      {
+        id: 'navigate-tasks',
+        label: '前往任务中心',
+        description: '管理任务与智能规划',
+        category: '导航',
+        shortcut: 'Ctrl + 2',
+        keywords: ['tasks', '任务'],
+        action: () => navigateWithReplace('/tasks'),
+      },
+      {
+        id: 'navigate-calendar',
+        label: '前往日历',
+        description: '查看任务安排与时间分布',
+        category: '导航',
+        shortcut: 'Ctrl + 3',
+        keywords: ['calendar', '日历', '安排'],
+        action: () => navigateWithReplace('/calendar'),
+      },
+      {
+        id: 'navigate-settings',
+        label: '打开设置中心',
+        description: '调整主题、集成与通知偏好',
+        category: '导航',
+        shortcut: 'Ctrl + ,',
+        keywords: ['settings', '配置', '设置'],
+        action: () => navigateWithReplace('/settings'),
+      },
+      {
+        id: 'focus-task-search',
+        label: '聚焦任务搜索',
+        description: '快速定位任务或过滤条件',
+        category: '任务',
+        shortcut: '/',
+        keywords: ['search', '搜索'],
+        action: focusTaskSearch,
+      },
+      {
+        id: 'create-task',
+        label: '新建任务',
+        description: '打开任务创建表单',
+        category: '任务',
+        shortcut: 'Ctrl + N',
+        keywords: ['新建任务', 'create task'],
+        action: handleCreateTask,
+      },
+      {
+        id: 'open-planning',
+        label: '打开规划中心',
+        description: '定位到智能规划面板',
+        category: '任务',
+        shortcut: 'G 然后 P',
+        keywords: ['规划', 'planning'],
+        action: handleOpenPlanning,
+      },
+      {
+        id: 'open-help-center',
+        label: '打开帮助中心',
+        description: '查看互动引导、快捷键与常见问题',
+        category: '帮助',
+        shortcut: 'Shift + /',
+        keywords: ['帮助', 'help center'],
+        action: openHelpCenter,
+      },
+      {
+        id: 'open-shortcuts-help',
+        label: '查看快捷键列表',
+        description: '显示全局快捷键列表',
+        category: '帮助',
+        shortcut: 'G 然后 H',
+        keywords: ['帮助', '快捷键'],
+        action: openShortcutHelp,
+      },
+      {
+        id: 'toggle-command-palette',
+        label: '打开指令面板',
+        description: '手动打开或关闭指令面板',
+        category: '帮助',
+        shortcut: 'Ctrl + K',
+        keywords: ['命令', 'palette'],
+        action: toggleCommandPalette,
+      },
+      {
+        id: 'cycle-theme',
+        label: '切换主题模式',
+        description: '在亮色、暗色与跟随系统之间切换',
+        category: '外观',
+        shortcut: 'Ctrl + Shift + L',
+        keywords: ['主题', '外观', 'theme'],
+        action: handleCycleTheme,
+      },
+    ],
+    [
+      focusTaskSearch,
+      handleCreateTask,
+      handleCycleTheme,
+      handleOpenPlanning,
+      navigateWithReplace,
+      openHelpCenter,
+      openShortcutHelp,
+      toggleCommandPalette,
+    ],
+  );
+
+  const shortcutGroups = useMemo<ShortcutGroup[]>(
+    () => [
+      {
+        title: '全局',
+        shortcuts: [
+          { keys: 'Ctrl / Cmd + K', description: '打开或关闭指令面板' },
+          { keys: 'Ctrl / Cmd + Shift + P', description: '强制打开指令面板' },
+          { keys: 'Shift + /', description: '打开帮助中心' },
+          { keys: 'Esc', description: '退出当前打开的叠加面板' },
+        ],
+      },
+      {
+        title: '导航',
+        shortcuts: [
+          { keys: 'Ctrl / Cmd + 1', description: '前往仪表盘' },
+          { keys: 'Ctrl / Cmd + 2', description: '前往任务中心' },
+          { keys: 'Ctrl / Cmd + 3', description: '前往日历' },
+          { keys: 'Ctrl / Cmd + ,', description: '打开设置中心' },
+          { keys: 'G 然后 D / T / C / S', description: '使用 Go 序列跳转目标页面' },
+        ],
+      },
+      {
+        title: '任务操作',
+        shortcuts: [
+          { keys: 'Ctrl / Cmd + N', description: '新建任务' },
+          { keys: '/', description: '聚焦任务搜索' },
+          { keys: 'G 然后 P', description: '打开智能规划中心' },
+        ],
+      },
+      {
+        title: '外观与帮助',
+        shortcuts: [
+          { keys: 'Ctrl / Cmd + Shift + L', description: '切换主题模式' },
+          { keys: 'G 然后 H', description: '打开帮助中心' },
+        ],
+      },
+    ],
+    [],
+  );
+
+  const navItems = useMemo<SidebarItem[]>(
+    () => [
+      {
+        key: 'dashboard',
+        label: '仪表盘',
+        icon: LayoutDashboard,
+        to: '/',
+      },
+      {
+        key: 'tasks',
+        label: '任务中心',
+        icon: CheckSquare,
+        to: '/tasks',
+      },
+      {
+        key: 'calendar',
+        label: '日历视图',
+        icon: CalendarDays,
+        to: '/calendar',
+      },
+      {
+        key: 'settings',
+        label: '设置中心',
+        icon: Settings2,
+        to: '/settings',
+      },
+      {
+        key: 'help-center',
+        label: '帮助中心',
+        icon: HelpCircle,
+        onSelect: openHelpCenter,
+        isActive: isHelpCenterOpen,
+      },
+    ],
+    [isHelpCenterOpen, openHelpCenter],
+  );
+
   return (
-    <AppShell
-      sidebarItems={navItems}
-      sidebarFooter={sidebarFooter}
-      phaseLabel="智能任务与时间管理"
-      phaseStatus={phaseStatus}
-    >
-      <Outlet />
-    </AppShell>
+    <KeyboardShortcutContext.Provider value={shortcutContextValue}>
+      <AppShell
+        sidebarItems={navItems}
+        sidebarFooter={sidebarFooter}
+        phaseLabel="智能任务与时间管理"
+        phaseStatus={phaseStatus}
+      >
+        <Outlet />
+      </AppShell>
+
+      <CommandPalette
+        open={isCommandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
+        commands={commandPaletteItems}
+      />
+
+      <KeyboardShortcutsHelp
+        open={isShortcutHelpOpen}
+        onOpenChange={setShortcutHelpOpen}
+        groups={shortcutGroups}
+      />
+
+      <HelpCenterDialog
+        open={isHelpCenterOpen}
+        onOpenChange={setHelpCenterOpen}
+        shortcutGroups={shortcutGroups}
+        onOpenShortcuts={openShortcutHelp}
+        onNavigateToSettings={navigateToSettingsFromHelp}
+      />
+
+      <OnboardingOrchestrator />
+    </KeyboardShortcutContext.Provider>
   );
 }
 

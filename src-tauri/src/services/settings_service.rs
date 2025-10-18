@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use std::sync::RwLock;
 
@@ -11,7 +11,7 @@ use crate::db::repositories::ai_settings_repository::AiSettingsRepository;
 use crate::db::repositories::settings_repository::{AppSettingRow, SettingsRepository};
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
-use crate::models::settings::AppSettings;
+use crate::models::settings::{AppSettings, DashboardConfig};
 use crate::utils::crypto::CryptoVault;
 
 const KEY_DEEPSEEK_API: &str = "deepseek_api_key";
@@ -19,6 +19,7 @@ const KEY_WORKDAY_START: &str = "workday_start_minute";
 const KEY_WORKDAY_END: &str = "workday_end_minute";
 const KEY_THEME: &str = "theme";
 const KEY_AI_FEEDBACK_OPT_OUT: &str = "ai_feedback_opt_out";
+const KEY_DASHBOARD_CONFIG: &str = "dashboard_config";
 
 const DEFAULT_WORKDAY_START: i16 = 9 * 60;
 const DEFAULT_WORKDAY_END: i16 = 18 * 60;
@@ -32,6 +33,12 @@ pub struct SettingsUpdateInput {
     pub workday_end_minute: Option<i16>,
     pub theme: Option<String>,
     pub ai_feedback_opt_out: Option<bool>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct DashboardConfigUpdateInput {
+    pub modules: Option<BTreeMap<String, bool>>,
+    pub last_updated_at: Option<Option<String>>,
 }
 
 pub struct SettingsService {
@@ -65,6 +72,14 @@ impl SettingsService {
             *guard = Some(settings.clone());
         }
         Ok(settings)
+    }
+
+    pub fn get_dashboard_config(&self) -> AppResult<DashboardConfig> {
+        let settings = self.get()?;
+        Ok(settings
+            .dashboard_config
+            .unwrap_or_else(DashboardConfig::default)
+            .normalize())
     }
 
     pub fn update(&self, input: SettingsUpdateInput) -> AppResult<AppSettings> {
@@ -114,6 +129,41 @@ impl SettingsService {
 
         if let Ok(mut guard) = self.cache.write() {
             *guard = Some(current.clone());
+        }
+
+        Ok(current)
+    }
+
+    pub fn update_dashboard_config(
+        &self,
+        input: DashboardConfigUpdateInput,
+    ) -> AppResult<DashboardConfig> {
+        let mut current = self.get_dashboard_config()?;
+        if let Some(overrides) = input.modules {
+            for (module, enabled) in overrides {
+                let normalized = module.to_lowercase();
+                if DashboardConfig::is_known_module(&normalized) {
+                    current.modules.insert(normalized, enabled);
+                }
+            }
+        }
+
+        let now = Utc::now().to_rfc3339();
+        current.last_updated_at = match input.last_updated_at {
+            Some(None) => None,
+            _ => Some(now.clone()),
+        };
+
+        self.persist_dashboard_config(&current)?;
+
+        if let Ok(mut guard) = self.cache.write() {
+            if let Some(settings) = guard.as_mut() {
+                settings.dashboard_config = Some(current.clone());
+                settings.updated_at = current
+                    .last_updated_at
+                    .clone()
+                    .unwrap_or_else(|| now.clone());
+            }
         }
 
         Ok(current)
@@ -190,6 +240,30 @@ impl SettingsService {
 
             Ok(())
         })
+    }
+    fn persist_dashboard_config(&self, config: &DashboardConfig) -> AppResult<()> {
+        let serialized = serde_json::to_string(config)?;
+        self.db.with_connection(|conn| {
+            SettingsRepository::upsert(conn, KEY_DASHBOARD_CONFIG, &serialized)?;
+            Ok(())
+        })
+    }
+
+    fn extract_dashboard_config(map: &mut HashMap<String, AppSettingRow>) -> DashboardConfig {
+        match map.remove(KEY_DASHBOARD_CONFIG) {
+            Some(row) => match serde_json::from_str::<DashboardConfig>(&row.value) {
+                Ok(config) => config.normalize(),
+                Err(err) => {
+                    warn!(
+                        target: "app::settings",
+                        error = %err,
+                        "failed to parse stored dashboard config, falling back to defaults"
+                    );
+                    DashboardConfig::default()
+                }
+            },
+            None => DashboardConfig::default(),
+        }
     }
 
     fn prepare_api_key_instruction(
@@ -324,6 +398,8 @@ impl SettingsService {
                 .get(KEY_AI_FEEDBACK_OPT_OUT)
                 .and_then(|row| row.value.parse::<bool>().ok());
 
+            let dashboard_config = Self::extract_dashboard_config(&mut map);
+
             let updated_at = latest_updated_at.unwrap_or_else(|| Utc::now().to_rfc3339());
 
             Ok(AppSettings {
@@ -341,6 +417,7 @@ impl SettingsService {
                 theme,
                 updated_at,
                 ai_feedback_opt_out,
+                dashboard_config: Some(dashboard_config),
             })
         })
     }
@@ -542,5 +619,56 @@ mod tests {
             .unwrap();
 
         service.clear_sensitive().unwrap();
+    }
+
+    #[test]
+    fn dashboard_config_defaults_are_available() {
+        let (service, _guard) = setup_service();
+
+        let config = service.get_dashboard_config().unwrap();
+        assert!(config
+            .modules
+            .get("quick-actions")
+            .copied()
+            .unwrap_or(false));
+        assert!(config.modules.get("today-tasks").copied().unwrap_or(false));
+        assert!(config.last_updated_at.is_none());
+
+        let settings = service.get().unwrap();
+        assert!(settings.dashboard_config.is_some());
+    }
+
+    #[test]
+    fn dashboard_config_updates_are_normalized_and_persisted() {
+        let (service, _guard) = setup_service();
+
+        let mut overrides = BTreeMap::new();
+        overrides.insert("quick-actions".to_string(), false);
+        overrides.insert("WORKLOAD-FORECAST".to_string(), true);
+
+        let updated = service
+            .update_dashboard_config(DashboardConfigUpdateInput {
+                modules: Some(overrides),
+                last_updated_at: None,
+            })
+            .unwrap();
+
+        assert_eq!(updated.modules.get("quick-actions"), Some(&false));
+        assert_eq!(updated.modules.get("workload-forecast"), Some(&true));
+        assert!(updated.last_updated_at.is_some());
+
+        let fetched = service.get_dashboard_config().unwrap();
+        assert_eq!(fetched.modules.get("quick-actions"), Some(&false));
+        assert_eq!(fetched.modules.get("workload-forecast"), Some(&true));
+
+        service
+            .update_dashboard_config(DashboardConfigUpdateInput {
+                modules: None,
+                last_updated_at: Some(None),
+            })
+            .unwrap();
+
+        let reset = service.get_dashboard_config().unwrap();
+        assert!(reset.last_updated_at.is_none());
     }
 }
