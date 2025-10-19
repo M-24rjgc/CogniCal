@@ -57,6 +57,8 @@ interface DriverInstance {
   setConfig: (config: DriverConfig) => void;
   setSteps: (steps: DriverStep[]) => void;
   refresh?: () => void;
+  moveNext?: () => void;
+  movePrevious?: () => void;
 }
 
 interface DriverStep {
@@ -177,9 +179,6 @@ const asDriverStep = (definition: OnboardingStepDefinition): DriverStep => {
       title: definition.title,
       description: definition.description,
       position: definition.placement ?? 'auto',
-      nextBtnText: DRIVER_TEXT.next,
-      prevBtnText: DRIVER_TEXT.prev,
-      doneBtnText: DRIVER_TEXT.done,
     },
   };
 };
@@ -548,6 +547,27 @@ const OnboardingOrchestrator = () => {
             const reason =
               teardownReasonRef.current ?? (completionRef.current ? 'completed' : undefined);
             cleanupDriver(reason);
+          },
+          onNextClick: (_element, _step, context) => {
+            teardownReasonRef.current = null;
+
+            if (context.driver.isLastStep?.()) {
+              teardownReasonRef.current = 'completed';
+              try {
+                context.driver.destroy();
+              } catch (error) {
+                console.warn('[onboarding] Failed to destroy driver on completion', error);
+                cleanupDriver('forced');
+              }
+              return;
+            }
+
+            try {
+              context.driver.moveNext?.();
+            } catch (error) {
+              console.warn('[onboarding] Failed to advance to next step', error);
+              cleanupDriver('forced');
+            }
           },
           onCloseClick: (_element, _step, context) => {
             if (teardownReasonRef.current !== 'forced') {
