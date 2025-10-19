@@ -26,7 +26,29 @@ const emptyToUndefined = (value: unknown) => {
   return value;
 };
 
+const TASK_STATUS_SET = new Set<string>(TASK_STATUSES as readonly string[]);
+const TASK_PRIORITY_SET = new Set<string>(TASK_PRIORITIES as readonly string[]);
 const TASK_TYPE_SET = new Set<string>(TASK_TYPES as readonly string[]);
+
+const normalizeEnumValue = (value: unknown, allowed: Set<string>): string | undefined => {
+  if (value === '' || value === null || typeof value === 'undefined') {
+    return undefined;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_');
+  if (!normalized || !allowed.has(normalized)) {
+    return undefined;
+  }
+
+  return normalized;
+};
 
 const toNumberIfPossible = (value: unknown) => {
   if (value === '' || value === null || typeof value === 'undefined') {
@@ -420,8 +442,14 @@ const taskParsePayloadSchema = z
   .object({
     title: z.preprocess(emptyToUndefined, z.string().trim().max(160).optional()),
     description: z.preprocess(emptyToUndefined, z.string().trim().max(4000).optional()),
-    status: z.enum(TASK_STATUSES).optional(),
-    priority: z.enum(TASK_PRIORITIES).optional(),
+    status: z.preprocess(
+      (value) => normalizeEnumValue(value, TASK_STATUS_SET),
+      z.enum(TASK_STATUSES).optional(),
+    ),
+    priority: z.preprocess(
+      (value) => normalizeEnumValue(value, TASK_PRIORITY_SET),
+      z.enum(TASK_PRIORITIES).optional(),
+    ),
     plannedStartAt: optionalIsoDateSchema,
     startAt: optionalIsoDateSchema,
     dueAt: optionalIsoDateSchema,
@@ -459,7 +487,10 @@ const taskParsePayloadSchema = z
         if (!value) {
           return undefined;
         }
-        return (TASK_TYPE_SET.has(value) ? value : undefined) as TaskType | undefined;
+        const normalized = value.trim().toLowerCase();
+        return (TASK_TYPE_SET.has(normalized) ? (normalized as TaskType) : undefined) as
+          | TaskType
+          | undefined;
       }),
     ai: aiSchema,
     externalLinks: z.preprocess(

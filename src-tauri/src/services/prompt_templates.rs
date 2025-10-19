@@ -47,7 +47,7 @@ Example response:
     "payload": {
         "title": "Prepare quarterly OKR summary",
         "description": "Compile last quarter results and draft next OKR recommendations",
-        "status": "in-progress",
+        "status": "in_progress",
         "priority": "high",
         "plannedStartAt": "2025-10-16T02:00:00Z",
         "startAt": null,
@@ -59,7 +59,7 @@ Example response:
         "ownerId": null,
         "isRecurring": false,
         "recurrence": null,
-        "taskType": "analysis",
+        "taskType": "work",
         "externalLinks": ["https://example.com/okr-template"]
     },
     "missingFields": ["startAt"],

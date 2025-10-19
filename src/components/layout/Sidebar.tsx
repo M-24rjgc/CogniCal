@@ -46,16 +46,26 @@ export function Sidebar({ items, footer, onNavigate, onClose }: SidebarProps) {
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = Boolean(item.isActive);
+          const isHelpCenter = item.key === 'help-center';
+
           const baseClasses =
             'group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground';
           const activeClasses = 'bg-muted/90 text-foreground shadow-sm';
+          const helpCenterClasses = isHelpCenter ? 'mt-3 border-t border-border/30 pt-3' : '';
 
           const content = (
             <>
-              <Icon className="h-4 w-4 text-primary transition group-hover:text-primary/80" />
-              <span className="flex-1">{item.label}</span>
+              <Icon className="h-4 w-4 text-primary transition group-hover:text-primary/80 flex-shrink-0" />
+              <div className="flex flex-1 flex-col min-w-0">
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.description ? (
+                  <span className="text-xs text-muted-foreground/70 truncate">
+                    {item.description}
+                  </span>
+                ) : null}
+              </div>
               {item.badge ? (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary flex-shrink-0">
                   {item.badge}
                 </span>
               ) : null}
@@ -76,7 +86,7 @@ export function Sidebar({ items, footer, onNavigate, onClose }: SidebarProps) {
                   onNavigate?.();
                 }}
                 className={({ isActive: routeActive }) =>
-                  cn(baseClasses, (routeActive || isActive) && activeClasses)
+                  cn(baseClasses, helpCenterClasses, (routeActive || isActive) && activeClasses)
                 }
               >
                 {content}
@@ -92,7 +102,7 @@ export function Sidebar({ items, footer, onNavigate, onClose }: SidebarProps) {
                 item.onSelect?.();
                 onNavigate?.();
               }}
-              className={cn(baseClasses, isActive && activeClasses)}
+              className={cn(baseClasses, helpCenterClasses, isActive && activeClasses)}
             >
               {content}
             </button>

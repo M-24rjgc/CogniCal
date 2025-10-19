@@ -630,6 +630,7 @@ function RootLayout() {
         icon: HelpCircle,
         onSelect: openHelpCenter,
         isActive: isHelpCenterOpen,
+        description: '查看引导、快捷键与文档',
       },
     ],
     [isHelpCenterOpen, openHelpCenter],
