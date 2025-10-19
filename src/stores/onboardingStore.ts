@@ -188,9 +188,16 @@ const onboardingStoreCreator: StateCreator<OnboardingStoreState> = (set, get) =>
 const persistedOnboardingStore = persist(onboardingStoreCreator, {
   name: ONBOARDING_STORAGE_KEY,
   version: ONBOARDING_PERSIST_VERSION,
-  storage: createJSONStorage(() =>
-    typeof window === 'undefined' ? memoryStorage : window.localStorage,
-  ),
+  storage: createJSONStorage(() => {
+    try {
+      return typeof window !== 'undefined' && window.localStorage
+        ? window.localStorage
+        : memoryStorage;
+    } catch {
+      console.warn('[onboarding] localStorage unavailable, using memory storage');
+      return memoryStorage;
+    }
+  }),
   partialize: (state): OnboardingStorePersist => ({
     progress: state.progress,
   }),

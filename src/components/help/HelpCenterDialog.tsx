@@ -99,13 +99,15 @@ export function HelpCenterDialog({
   const handleReplayTour = useCallback(() => {
     requestReplay();
     dispatchOnboardingReplayEvent();
+    onOpenChange(false);
     pushToast({ title: '即将重新播放互动引导', variant: 'default' });
-  }, [requestReplay]);
+  }, [onOpenChange, requestReplay]);
 
   const handleResetProgress = useCallback(() => {
     resetProgress();
+    onOpenChange(false);
     pushToast({ title: '已重置互动引导进度', variant: 'success' });
-  }, [resetProgress]);
+  }, [onOpenChange, resetProgress]);
 
   const effectiveDocsUrl = docsUrl ?? HELP_CENTER_DOCS_URL;
 

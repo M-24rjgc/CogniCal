@@ -2,6 +2,13 @@ import type { KeyboardShortcutContextValue } from '../hooks/useKeyboardShortcuts
 
 export const ONBOARDING_REPLAY_EVENT = 'onboarding:replay';
 
+export enum OnboardingErrorType {
+  ELEMENT_NOT_FOUND = 'ELEMENT_NOT_FOUND',
+  DRIVER_LOAD_FAILED = 'DRIVER_LOAD_FAILED',
+  NAVIGATION_FAILED = 'NAVIGATION_FAILED',
+  STATE_CORRUPTION = 'STATE_CORRUPTION',
+}
+
 export type OnboardingStepId =
   | 'dashboard-overview'
   | 'task-quick-create'
@@ -14,7 +21,9 @@ export interface OnboardingStepDefinition {
   selector: string;
   title: string;
   description: string;
-  placement?: 'top' | 'bottom' | 'left' | 'right';
+  placement?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
+  dependencies?: OnboardingStepId[];
+  skipIf?: () => boolean;
 }
 
 export const ONBOARDING_TOUR_STEPS: readonly OnboardingStepDefinition[] = [
