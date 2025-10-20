@@ -346,6 +346,8 @@ export const taskFiltersSchema = z
     includeArchived: z.boolean().optional(),
     dueAfter: optionalIsoDateSchema,
     dueBefore: optionalIsoDateSchema,
+    windowStart: optionalIsoDateSchema,
+    windowEnd: optionalIsoDateSchema,
     updatedAfter: optionalIsoDateSchema,
     updatedBefore: optionalIsoDateSchema,
     sortBy: z.enum(TASK_SORT_FIELDS).optional(),
@@ -385,6 +387,18 @@ export const taskFiltersSchema = z
           code: 'custom',
           path: ['updatedBefore'],
           message: '更新时间范围无效',
+        });
+      }
+    }
+
+    if (data.windowStart && data.windowEnd) {
+      const start = Date.parse(data.windowStart);
+      const end = Date.parse(data.windowEnd);
+      if (!Number.isNaN(start) && !Number.isNaN(end) && start > end) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['windowEnd'],
+          message: '时间窗口结束需晚于开始时间',
         });
       }
     }

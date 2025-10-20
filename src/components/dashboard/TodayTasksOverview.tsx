@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  CalendarCheck,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -16,7 +17,13 @@ import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
 import { useTasks } from '../../hooks/useTasks';
 import { listTasks, isAppError } from '../../services/tauriApi';
-import type { Task, TaskPriority, TaskStatus } from '../../types/task';
+import type { TaskPriority, TaskStatus } from '../../types/task';
+import {
+  formatTaskRelative,
+  formatTaskTimeRange,
+  getTaskTiming,
+  type TaskTimingInfo,
+} from '../../utils/taskTime';
 
 const MAX_COLLAPSED_ITEMS = 3;
 const MAX_EXPANDED_ITEMS = 6;
@@ -76,47 +83,6 @@ const resolveError = (error: unknown): Error | null => {
   return new Error('加载今日任务时出现问题');
 };
 
-const isTaskOverdue = (task: Task) => {
-  if (!task.dueAt || task.status === 'done') {
-    return false;
-  }
-  const dueTime = Date.parse(task.dueAt);
-  if (Number.isNaN(dueTime)) {
-    return false;
-  }
-  return dueTime < Date.now();
-};
-
-const formatDueTime = (iso?: string | null) => {
-  if (!iso) return '未设置截止时间';
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) {
-    return '截止时间无效';
-  }
-  return parsed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-};
-
-const formatRelativeDue = (iso?: string | null) => {
-  if (!iso) return '无截止时间';
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return '时间无效';
-  const diffMs = parsed.getTime() - Date.now();
-  const diffMinutes = Math.round(diffMs / 60000);
-  if (diffMinutes === 0) return '即将到期';
-  if (Math.abs(diffMinutes) < 60) {
-    const value = Math.abs(diffMinutes);
-    return diffMinutes > 0 ? `${value} 分钟后到期` : `${value} 分钟前已逾期`;
-  }
-  const diffHours = Math.round(diffMinutes / 60);
-  if (Math.abs(diffHours) < 24) {
-    const value = Math.abs(diffHours);
-    return diffHours > 0 ? `${value} 小时后到期` : `${value} 小时前已逾期`;
-  }
-  const diffDays = Math.round(diffHours / 24);
-  const value = Math.abs(diffDays);
-  return diffDays > 0 ? `${value} 天后到期` : `${value} 天前已逾期`;
-};
-
 const TodayTasksOverview = () => {
   const navigate = useNavigate();
   const { fetchTasks, setFilters } = useTasks({ autoFetch: false });
@@ -144,14 +110,14 @@ const TodayTasksOverview = () => {
     queryKey: ['dashboard', 'today-tasks', startIso, endIso],
     queryFn: async () => {
       const response = await listTasks({
-        dueAfter: startIso,
-        dueBefore: endIso,
+        windowStart: startIso,
+        windowEnd: endIso,
         includeArchived: false,
         statuses: ['todo', 'in_progress', 'blocked', 'done'],
         sortBy: 'dueAt',
         sortOrder: 'asc',
         page: 1,
-        pageSize: 50,
+        pageSize: 100,
       });
       return response.items;
     },
@@ -159,28 +125,50 @@ const TodayTasksOverview = () => {
     gcTime: 5 * 60 * 1000,
   });
 
+  const taskEntries = useMemo(() => {
+    const now = new Date();
+    return (todayTasks ?? []).map((task) => ({ task, timing: getTaskTiming(task, now) }));
+  }, [todayTasks]);
+
   const metrics = useMemo(() => {
-    const source = todayTasks ?? [];
-    const pending = source.filter((task) => task.status !== 'done' && task.status !== 'archived');
-    const completed = source.filter((task) => task.status === 'done').length;
-    const overdue = pending.filter((task) => isTaskOverdue(task)).length;
-    const completion = source.length === 0 ? 0 : Math.round((completed / source.length) * 100);
+    const pending = taskEntries.filter(
+      ({ task }) => task.status !== 'done' && task.status !== 'archived',
+    );
+    const completed = taskEntries.filter(({ task }) => task.status === 'done').length;
+    const overdue = pending.filter(({ timing }) => timing.isOverdue).length;
+    const completion =
+      taskEntries.length === 0 ? 0 : Math.round((completed / taskEntries.length) * 100);
     return {
-      total: source.length,
+      total: taskEntries.length,
       completed,
       pendingCount: pending.length,
       overdue,
       completion,
       pending,
     };
-  }, [todayTasks]);
+  }, [taskEntries]);
 
-  const pendingTasks = metrics.pending;
+  const orderedPendingEntries = useMemo(() => {
+    const score = ({ timing }: { timing: TaskTimingInfo }) => {
+      if (timing.minutesUntilEnd !== null && timing.minutesUntilEnd < 0) {
+        return timing.minutesUntilEnd;
+      }
+      if (timing.minutesUntilStart !== null && timing.minutesUntilStart >= 0) {
+        return timing.minutesUntilStart;
+      }
+      if (timing.minutesUntilEnd !== null) {
+        return timing.minutesUntilEnd;
+      }
+      return Number.MAX_SAFE_INTEGER;
+    };
 
-  const displayedTasks = useMemo(() => {
+    return [...metrics.pending].sort((a, b) => score(a) - score(b));
+  }, [metrics.pending]);
+
+  const displayedEntries = useMemo(() => {
     const limit = isExpanded ? MAX_EXPANDED_ITEMS : MAX_COLLAPSED_ITEMS;
-    return pendingTasks.slice(0, limit);
-  }, [isExpanded, pendingTasks]);
+    return orderedPendingEntries.slice(0, limit);
+  }, [isExpanded, orderedPendingEntries]);
 
   const moduleError = resolveError(error);
 
@@ -190,8 +178,8 @@ const TodayTasksOverview = () => {
 
   const handleViewAll = useCallback(() => {
     const nextFilters = {
-      dueAfter: startIso,
-      dueBefore: endIso,
+      windowStart: startIso,
+      windowEnd: endIso,
       statuses: ['todo', 'in_progress', 'blocked'] as TaskStatus[],
       includeArchived: false,
       sortBy: 'dueAt' as const,
@@ -279,8 +267,11 @@ const TodayTasksOverview = () => {
           </div>
         ) : (
           <div className="space-y-2">
-            {displayedTasks.map((task) => {
-              const overdue = isTaskOverdue(task);
+            {displayedEntries.map(({ task, timing }) => {
+              const { startText, endText } = formatTaskTimeRange(timing);
+              const relative = formatTaskRelative(timing);
+              const overdue = timing.isOverdue;
+              const priority = task.priority ?? 'medium';
               return (
                 <button
                   key={task.id}
@@ -299,7 +290,7 @@ const TodayTasksOverview = () => {
                       <span
                         className={`text-xs font-medium ${overdue ? 'text-destructive' : 'text-muted-foreground'}`}
                       >
-                        {formatRelativeDue(task.dueAt)}
+                        {relative}
                       </span>
                     </div>
                     {isExpanded && task.description ? (
@@ -308,12 +299,16 @@ const TodayTasksOverview = () => {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <CalendarClock className="h-3.5 w-3.5" />
-                        {formatDueTime(task.dueAt)}
+                        开始 {startText}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarCheck className="h-3.5 w-3.5" />
+                        截止 {endText}
                       </span>
                       {task.priority ? (
                         <span className="inline-flex items-center gap-1">
                           优先级
-                          <strong>{PRIORITY_LABELS[task.priority] ?? task.priority}</strong>
+                          <strong>{PRIORITY_LABELS[priority] ?? priority}</strong>
                         </span>
                       ) : null}
                     </div>

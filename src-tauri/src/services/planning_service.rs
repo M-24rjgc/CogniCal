@@ -23,7 +23,7 @@ use crate::services::ai_service::AiService;
 use crate::services::behavior_learning::{BehaviorLearningService, PreferenceSnapshot};
 use crate::services::schedule_optimizer::{
     detect_conflicts, PlanOption, PlanRationaleStep, ScheduleConflict, ScheduleConstraints,
-    SchedulingPreferences, TimeBlockCandidate,
+    ScheduleOptimizer, SchedulableTask, SchedulingPreferences, TimeBlockCandidate,
 };
 use crate::services::schedule_utils;
 use crate::services::task_service::TaskService;
@@ -134,13 +134,7 @@ impl PlanningService {
 
         let conn = self.db.get_connection()?;
         let has_ai_key = self.ai_service.has_configured_provider(&conn)?;
-
-        // 强制要求 API Key - 不提供低质量的本地回退
-        if !has_ai_key {
-            return Err(AppError::validation(
-                "生成智能规划需要配置 DeepSeek API Key。请在设置中配置后重试。",
-            ));
-        }
+        let seed = input.seed;
 
         let tasks = self.fetch_tasks(&input.task_ids)?;
         let tasks_by_id = tasks
@@ -175,16 +169,26 @@ impl PlanningService {
         // Drop connection before async operations
         drop(conn);
 
-        // 使用 DeepSeek AI 生成智能规划（不再提供低质量回退）
-        let options = self
-            .generate_with_ai(
+        let options = if has_ai_key {
+            let generated = self
+                .generate_with_ai(
+                    &tasks_for_ai,
+                    &constraints_for_ai,
+                    &scheduling_preferences,
+                    &preference_snapshot,
+                )
+                .await?;
+            info!(target: "app::planning", "Successfully generated plan options using DeepSeek AI");
+            generated
+        } else {
+            warn!(target: "app::planning", "DeepSeek API Key 未配置，使用内置调度算法作为回退");
+            self.generate_with_optimizer(
                 &tasks_for_ai,
                 &constraints_for_ai,
                 &scheduling_preferences,
-                &preference_snapshot,
-            )
-            .await?;
-        info!(target: "app::planning", "Successfully generated plan options using DeepSeek AI");
+                seed,
+            )?
+        };
 
         // Reconnect for database operations
         let mut conn = self.db.get_connection()?;
@@ -501,6 +505,26 @@ impl PlanningService {
         self.convert_ai_response_to_plan_options(schedule_dto, tasks)
     }
 
+    fn generate_with_optimizer(
+        &self,
+        tasks: &[TaskRecord],
+        constraints: &ScheduleConstraints,
+        preferences: &SchedulingPreferences,
+        seed: Option<u64>,
+    ) -> AppResult<Vec<PlanOption>> {
+        let optimizer = ScheduleOptimizer::new(seed);
+        let schedulable_tasks = tasks
+            .iter()
+            .map(Self::map_schedulable_task)
+            .collect::<Vec<_>>();
+
+        optimizer.generate_plan_options(
+            schedulable_tasks,
+            constraints.clone(),
+            preferences.clone(),
+        )
+    }
+
     /// Convert AI SchedulePlanDto to our PlanOption format
     fn convert_ai_response_to_plan_options(
         &self,
@@ -634,6 +658,41 @@ impl PlanningService {
             conflicts,
             preference_snapshot,
         })
+    }
+}
+
+impl PlanningService {
+    fn map_schedulable_task(task: &TaskRecord) -> SchedulableTask {
+        SchedulableTask {
+            id: task.id.clone(),
+            title: task.title.clone(),
+            due_at: task.due_at.clone(),
+            earliest_start_at: task
+                .start_at
+                .as_ref()
+                .or(task.planned_start_at.as_ref())
+                .cloned(),
+            estimated_minutes: task.estimated_minutes.or_else(|| {
+                task.estimated_hours
+                    .map(|hours| (hours * 60.0).round() as i64)
+            }),
+            priority_weight: priority_weight(&task.priority),
+            is_parallelizable: task
+                .tags
+                .iter()
+                .any(|tag| tag.eq_ignore_ascii_case("parallel")
+                    || tag.eq_ignore_ascii_case("parallelizable")),
+        }
+    }
+}
+
+fn priority_weight(priority: &str) -> f32 {
+    match priority.to_ascii_lowercase().as_str() {
+        "urgent" => 1.2,
+        "high" => 1.0,
+        "medium" => 0.7,
+        "low" => 0.4,
+        _ => 0.6,
     }
 }
 

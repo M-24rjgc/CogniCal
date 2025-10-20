@@ -24,6 +24,8 @@ pub struct TaskListFilters {
     pub include_archived: Option<bool>,
     pub due_after: Option<String>,
     pub due_before: Option<String>,
+    pub window_start: Option<String>,
+    pub window_end: Option<String>,
     pub updated_after: Option<String>,
     pub updated_before: Option<String>,
     pub sort_by: Option<String>,
@@ -43,6 +45,8 @@ impl Default for TaskListFilters {
             include_archived: None,
             due_after: None,
             due_before: None,
+            window_start: None,
+            window_end: None,
             updated_after: None,
             updated_before: None,
             sort_by: Some("createdAt".to_string()),
@@ -122,6 +126,8 @@ fn filter_and_paginate(records: Vec<TaskRecord>, filters: TaskListFilters) -> Ta
 
     let due_after = filters.due_after.as_deref().and_then(parse_timestamp);
     let due_before = filters.due_before.as_deref().and_then(parse_timestamp);
+    let window_start = filters.window_start.as_deref().and_then(parse_timestamp);
+    let window_end = filters.window_end.as_deref().and_then(parse_timestamp);
     let updated_after = filters.updated_after.as_deref().and_then(parse_timestamp);
     let updated_before = filters.updated_before.as_deref().and_then(parse_timestamp);
 
@@ -138,6 +144,8 @@ fn filter_and_paginate(records: Vec<TaskRecord>, filters: TaskListFilters) -> Ta
                 search.as_deref(),
                 due_after,
                 due_before,
+                window_start,
+                window_end,
                 updated_after,
                 updated_before,
             )
@@ -191,6 +199,8 @@ fn match_filters(
     search: Option<&str>,
     due_after: Option<i64>,
     due_before: Option<i64>,
+    window_start: Option<i64>,
+    window_end: Option<i64>,
     updated_after: Option<i64>,
     updated_before: Option<i64>,
 ) -> bool {
@@ -252,6 +262,23 @@ fn match_filters(
         }
     }
 
+    if window_start.is_some() || window_end.is_some() {
+        let task_start = resolve_task_start(task);
+        let task_end = resolve_task_end(task);
+
+        if let Some(boundary) = window_start {
+            if task_end.map(|ts| ts < boundary).unwrap_or(true) {
+                return false;
+            }
+        }
+
+        if let Some(boundary) = window_end {
+            if task_start.map(|ts| ts > boundary).unwrap_or(true) {
+                return false;
+            }
+        }
+    }
+
     if let Some(boundary) = updated_after {
         let updated_ts = parse_timestamp_opt(Some(task.updated_at.as_str()));
         if updated_ts.map(|ts| ts < boundary).unwrap_or(true) {
@@ -307,6 +334,25 @@ fn compare_option_timestamp(a: Option<&String>, b: Option<&String>) -> std::cmp:
         (false, true) => std::cmp::Ordering::Greater,
         _ => std::cmp::Ordering::Equal,
     }
+}
+
+fn resolve_task_start(task: &TaskRecord) -> Option<i64> {
+    parse_timestamp_opt(task.start_at.as_deref())
+        .or_else(|| parse_timestamp_opt(task.planned_start_at.as_deref()))
+        .or_else(|| {
+            parse_timestamp_opt(
+                task.ai
+                    .as_ref()
+                    .and_then(|ai| ai.suggested_start_at.as_deref()),
+            )
+        })
+        .or_else(|| parse_timestamp_opt(task.due_at.as_deref()))
+}
+
+fn resolve_task_end(task: &TaskRecord) -> Option<i64> {
+    parse_timestamp_opt(task.due_at.as_deref())
+        .or_else(|| parse_timestamp_opt(task.completed_at.as_deref()))
+        .or_else(|| resolve_task_start(task))
 }
 
 fn parse_timestamp(value: &str) -> Option<i64> {

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   AlarmClock,
   AlertTriangle,
+  CalendarCheck,
   CalendarClock,
   ChevronDown,
   ChevronUp,
@@ -18,6 +19,12 @@ import { Skeleton } from '../ui/skeleton';
 import { useTasks } from '../../hooks/useTasks';
 import { listTasks, isAppError } from '../../services/tauriApi';
 import type { TaskPriority, TaskStatus } from '../../types/task';
+import {
+  formatTaskRelative,
+  formatTaskTimeRange,
+  getTaskTiming,
+  type TaskTimingInfo,
+} from '../../utils/taskTime';
 
 const DEFAULT_THRESHOLD_HOURS = 24;
 const EXPANDED_THRESHOLD_HOURS = 72;
@@ -53,7 +60,7 @@ const emptyState = (
   <div className="flex flex-col items-start gap-3 rounded-2xl border border-dashed border-border/60 bg-muted/20 p-6 text-sm text-muted-foreground">
     <div className="flex items-center gap-2">
       <AlarmClock className="h-4 w-4" />
-      <span>未来 24 小时内没有即将到期的任务，请继续保持节奏。</span>
+      <span>未来 24 小时内没有即将开始或结束的任务，请继续保持节奏。</span>
     </div>
     <Button asChild variant="outline" size="sm">
       <a href="/tasks">浏览任务列表</a>
@@ -76,28 +83,6 @@ const addHours = (date: Date, hours: number) => {
   return result;
 };
 
-const getMinutesToDue = (iso?: string | null) => {
-  if (!iso) return null;
-  const parsed = Date.parse(iso);
-  if (Number.isNaN(parsed)) return null;
-  return Math.round((parsed - Date.now()) / 60000);
-};
-
-const formatRelative = (minutes: number | null) => {
-  if (minutes === null) return '未设置截止时间';
-  if (minutes <= 0) {
-    const value = Math.abs(minutes);
-    if (value < 60) return `${value} 分钟前到期`;
-    const hours = Math.round(value / 60);
-    return `${hours} 小时前到期`;
-  }
-  if (minutes < 60) return `${minutes} 分钟后到期`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} 小时后到期`;
-  const days = Math.round(hours / 24);
-  return `${days} 天后到期`;
-};
-
 const UpcomingTasksAlert = () => {
   const navigate = useNavigate();
   const { fetchTasks, setFilters } = useTasks({ autoFetch: false });
@@ -109,11 +94,11 @@ const UpcomingTasksAlert = () => {
     queryKey: ['dashboard', 'upcoming-alerts', thresholdHours],
     queryFn: async () => {
       const now = new Date();
-      const dueAfter = now.toISOString();
-      const dueBefore = addHours(now, thresholdHours).toISOString();
+      const windowStart = now.toISOString();
+      const windowEnd = addHours(now, thresholdHours).toISOString();
       const response = await listTasks({
-        dueAfter,
-        dueBefore,
+        windowStart,
+        windowEnd,
         includeArchived: false,
         statuses: ['todo', 'in_progress', 'blocked'],
         sortBy: 'dueAt',
@@ -121,7 +106,7 @@ const UpcomingTasksAlert = () => {
         page: 1,
         pageSize: 50,
       });
-      return { items: response.items, dueAfter, dueBefore };
+      return { items: response.items, windowStart, windowEnd };
     },
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
@@ -130,29 +115,56 @@ const UpcomingTasksAlert = () => {
 
   const tasks = useMemo(() => data?.items ?? [], [data]);
 
+  const taskEntries = useMemo(() => {
+    const now = new Date();
+    return tasks.map((task) => ({ task, timing: getTaskTiming(task, now) }));
+  }, [tasks]);
+
   const metrics = useMemo(() => {
     let urgent = 0;
     let critical = 0;
-    tasks.forEach((task) => {
+
+    taskEntries.forEach(({ task, timing }) => {
       if (task.priority === 'urgent') {
         urgent += 1;
       }
-      const minutes = getMinutesToDue(task.dueAt);
-      if (minutes !== null && minutes <= 120) {
+      if (
+        timing.nextTriggerMinutes !== null &&
+        timing.nextTriggerMinutes >= 0 &&
+        timing.nextTriggerMinutes <= 120
+      ) {
         critical += 1;
       }
     });
+
     return {
-      total: tasks.length,
+      total: taskEntries.length,
       urgent,
       critical,
     };
-  }, [tasks]);
+  }, [taskEntries]);
 
-  const displayedTasks = useMemo(() => {
+  const orderedEntries = useMemo(() => {
+    const score = (timing: TaskTimingInfo) => {
+      if (timing.minutesUntilEnd !== null && timing.minutesUntilEnd < 0) {
+        return timing.minutesUntilEnd;
+      }
+      if (timing.minutesUntilStart !== null && timing.minutesUntilStart >= 0) {
+        return timing.minutesUntilStart;
+      }
+      if (timing.minutesUntilEnd !== null) {
+        return timing.minutesUntilEnd;
+      }
+      return Number.MAX_SAFE_INTEGER;
+    };
+
+    return [...taskEntries].sort((a, b) => score(a.timing) - score(b.timing));
+  }, [taskEntries]);
+
+  const displayedEntries = useMemo(() => {
     const limit = isExpanded ? EXPANDED_ITEMS : COLLAPSED_ITEMS;
-    return tasks.slice(0, limit);
-  }, [isExpanded, tasks]);
+    return orderedEntries.slice(0, limit);
+  }, [isExpanded, orderedEntries]);
 
   const moduleError = resolveError(error);
 
@@ -165,11 +177,11 @@ const UpcomingTasksAlert = () => {
   }, [refetch]);
 
   const handleViewAll = useCallback(() => {
-    const dueAfter = data?.dueAfter ?? new Date().toISOString();
-    const dueBefore = data?.dueBefore ?? addHours(new Date(), thresholdHours).toISOString();
+    const windowStart = data?.windowStart ?? new Date().toISOString();
+    const windowEnd = data?.windowEnd ?? addHours(new Date(), thresholdHours).toISOString();
     const nextFilters = {
-      dueAfter,
-      dueBefore,
+      windowStart,
+      windowEnd,
       statuses: ['todo', 'in_progress', 'blocked'] as TaskStatus[],
       includeArchived: false,
       sortBy: 'dueAt' as const,
@@ -186,8 +198,8 @@ const UpcomingTasksAlert = () => {
   return (
     <ModuleContainer
       moduleId="upcoming-alerts"
-      title="即将到期提醒"
-      description="跟踪未来 24 小时内可能失控的任务，及时调整节奏。"
+      title="即将开始与到期提醒"
+      description="跟踪未来 24 小时内即将开始或将要结束的任务，及时调整节奏。"
       isLoading={isLoading}
       loadingFallback={loadingFallback}
       isEmpty={empty}
@@ -212,7 +224,7 @@ const UpcomingTasksAlert = () => {
               <span>{metrics.total} 项</span>
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{metrics.total}</div>
-            <p className="mt-1 text-xs text-muted-foreground">需要排定的即将到期任务</p>
+            <p className="mt-1 text-xs text-muted-foreground">需要关注的即将开始或结束任务</p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-4">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -234,38 +246,59 @@ const UpcomingTasksAlert = () => {
               <span>{metrics.critical} 项</span>
             </div>
             <div className="mt-2 text-2xl font-semibold text-foreground">{metrics.critical}</div>
-            <p className="mt-1 text-xs text-muted-foreground">距离截止不到两小时的关键任务</p>
+            <p className="mt-1 text-xs text-muted-foreground">距离开始或结束不到两小时的关键任务</p>
           </div>
         </div>
 
         {metrics.total === 0 ? null : (
           <div className="space-y-2">
-            {displayedTasks.map((task) => {
-              const minutes = getMinutesToDue(task.dueAt);
-              const isCritical = minutes !== null && minutes <= 120;
-              const isOverdue = minutes !== null && minutes <= 0;
+            {displayedEntries.map(({ task, timing }) => {
+              const relativeText = formatTaskRelative(timing);
+              const { startText, endText } = formatTaskTimeRange(timing);
+              const priority = task.priority ?? 'medium';
+              const isCritical =
+                timing.nextTriggerMinutes !== null &&
+                timing.nextTriggerMinutes >= 0 &&
+                timing.nextTriggerMinutes <= 120;
+              const isOverdue = timing.isOverdue;
+              const highlightLabel = (() => {
+                if (isOverdue) return '已超时';
+                if (
+                  timing.phase === 'in_progress' &&
+                  timing.minutesUntilEnd !== null &&
+                  timing.minutesUntilEnd >= 0 &&
+                  timing.minutesUntilEnd <= 120
+                ) {
+                  return '尽快收尾';
+                }
+                if (timing.phase === 'upcoming' && isCritical) {
+                  return '准备开始';
+                }
+                return null;
+              })();
+
               return (
                 <button
                   key={task.id}
                   type="button"
                   onClick={handleViewAll}
-                  className={`w-full rounded-2xl border border-border/60 bg-background/80 p-4 text-left transition hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isCritical ? 'border-amber-400/60' : ''}`}
+                  className={`w-full rounded-2xl border border-border/60 bg-background/80 p-4 text-left transition hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${isCritical ? 'border-amber-400/60' : ''} ${isOverdue ? 'border-destructive/60' : ''}`}
                 >
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <Badge
-                          variant={task.priority === 'urgent' ? 'destructive' : 'outline'}
+                          variant={priority === 'urgent' ? 'destructive' : 'outline'}
                           className="text-xs"
                         >
-                          {PRIORITY_LABELS[task.priority ?? 'medium'] ?? task.priority}
+                          {PRIORITY_LABELS[priority] ?? priority}
                         </Badge>
                         <span className="text-sm font-medium text-foreground">{task.title}</span>
                       </div>
                       <span
                         className={`text-xs font-semibold ${isOverdue ? 'text-destructive' : 'text-muted-foreground'}`}
                       >
-                        {formatRelative(minutes)}
+                        {relativeText}
                       </span>
                     </div>
                     {isExpanded && task.description ? (
@@ -274,17 +307,18 @@ const UpcomingTasksAlert = () => {
                     <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1">
                         <CalendarClock className="h-3.5 w-3.5" />
-                        {task.dueAt
-                          ? new Date(task.dueAt).toLocaleTimeString([], {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })
-                          : '未设置截止时间'}
+                        开始 {startText}
                       </span>
-                      {isCritical ? (
-                        <span className="inline-flex items-center gap-1 font-semibold text-amber-600">
+                      <span className="inline-flex items-center gap-1">
+                        <CalendarCheck className="h-3.5 w-3.5" />
+                        结束 {endText}
+                      </span>
+                      {highlightLabel ? (
+                        <span
+                          className={`inline-flex items-center gap-1 font-semibold ${isOverdue ? 'text-destructive' : 'text-amber-600'}`}
+                        >
                           <AlarmClock className="h-3 w-3" />
-                          立即准备
+                          {highlightLabel}
                         </span>
                       ) : null}
                     </div>
@@ -301,7 +335,7 @@ const UpcomingTasksAlert = () => {
             className="px-0 text-sm font-medium text-primary hover:bg-transparent hover:underline"
             onClick={handleViewAll}
           >
-            查看到期任务详情
+            查看时间敏感任务详情
           </Button>
           <Button variant="ghost" size="sm" onClick={handleToggle}>
             {isExpanded ? (

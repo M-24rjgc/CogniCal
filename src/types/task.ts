@@ -148,6 +148,8 @@ export interface TaskFilters {
   includeArchived?: boolean;
   dueAfter?: string;
   dueBefore?: string;
+  windowStart?: string;
+  windowEnd?: string;
   updatedAfter?: string;
   updatedBefore?: string;
   sortBy?: TaskSortField;

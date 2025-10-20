@@ -1285,6 +1285,25 @@ const mergeDashboardConfig = (
   });
 };
 
+const parseIsoToMs = (iso?: string | null): number | null => {
+  if (!iso) return null;
+  const timestamp = Date.parse(iso);
+  return Number.isNaN(timestamp) ? null : timestamp;
+};
+
+const resolveTaskStart = (task: Task): number | null => {
+  return (
+    parseIsoToMs(task.startAt) ??
+    parseIsoToMs(task.plannedStartAt) ??
+    parseIsoToMs(task.ai?.suggestedStartAt ?? null) ??
+    parseIsoToMs(task.dueAt)
+  );
+};
+
+const resolveTaskEnd = (task: Task): number | null => {
+  return parseIsoToMs(task.dueAt) ?? parseIsoToMs(task.completedAt) ?? resolveTaskStart(task);
+};
+
 const applyFilters = (tasks: Task[], filters: TaskFilters): Task[] => {
   let filtered = [...tasks];
 
@@ -1332,6 +1351,21 @@ const applyFilters = (tasks: Task[], filters: TaskFilters): Task[] => {
       if (!task.dueAt) return false;
       const due = Date.parse(task.dueAt);
       return !Number.isNaN(dueBefore) && !Number.isNaN(due) && due <= dueBefore;
+    });
+  }
+  const windowStart = parseIsoToMs(filters.windowStart ?? null);
+  const windowEnd = parseIsoToMs(filters.windowEnd ?? null);
+  if (windowStart !== null || windowEnd !== null) {
+    filtered = filtered.filter((task) => {
+      const taskStart = resolveTaskStart(task);
+      const taskEnd = resolveTaskEnd(task);
+      if (windowStart !== null && (taskEnd === null || taskEnd < windowStart)) {
+        return false;
+      }
+      if (windowEnd !== null && (taskStart === null || taskStart > windowEnd)) {
+        return false;
+      }
+      return true;
     });
   }
   if (filters.complexityMin !== undefined) {
