@@ -5,6 +5,7 @@ import {
   KeyRound,
   LayoutDashboard,
   Loader2,
+  MessageSquare,
   Settings2,
 } from 'lucide-react';
 import {
@@ -30,6 +31,7 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useTheme, type ThemeMode } from '../providers/theme-provider';
 import CalendarPage from '../pages/Calendar';
+import ChatPage from '../pages/Chat';
 import DashboardPage from '../pages/Dashboard';
 import SettingsPage from '../pages/Settings';
 import TasksPage from '../pages/Tasks';
@@ -269,6 +271,16 @@ function RootLayout() {
   );
 
   useHotkeys(
+    'ctrl+4,meta+4',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      navigateWithReplace('/chat');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
     'ctrl+shift+l,meta+shift+l',
     (event) => {
       if (isEditableElement(event.target)) return;
@@ -318,7 +330,7 @@ function RootLayout() {
   );
 
   useHotkeys(
-    'd,t,c,s,p,h',
+    'd,t,c,a,s,p,h',
     (event) => {
       if (isOverlayOpen) return;
       if (!consumeGoSequence()) return;
@@ -333,6 +345,9 @@ function RootLayout() {
           break;
         case 'c':
           navigateWithReplace('/calendar');
+          break;
+        case 'a':
+          navigateWithReplace('/chat');
           break;
         case 's':
           navigateWithReplace('/settings');
@@ -474,6 +489,15 @@ function RootLayout() {
         action: () => navigateWithReplace('/calendar'),
       },
       {
+        id: 'navigate-chat',
+        label: '前往 AI 对话',
+        description: '与 AI 助手自由对话',
+        category: '导航',
+        shortcut: 'Ctrl + 4',
+        keywords: ['chat', 'ai', '对话', '聊天'],
+        action: () => navigateWithReplace('/chat'),
+      },
+      {
         id: 'navigate-settings',
         label: '打开设置中心',
         description: '调整主题、集成与通知偏好',
@@ -575,8 +599,9 @@ function RootLayout() {
           { keys: 'Ctrl / Cmd + 1', description: '前往仪表盘' },
           { keys: 'Ctrl / Cmd + 2', description: '前往任务中心' },
           { keys: 'Ctrl / Cmd + 3', description: '前往日历' },
+          { keys: 'Ctrl / Cmd + 4', description: '前往 AI 对话' },
           { keys: 'Ctrl / Cmd + ,', description: '打开设置中心' },
-          { keys: 'G 然后 D / T / C / S', description: '使用 Go 序列跳转目标页面' },
+          { keys: 'G 然后 D / T / C / A / S', description: '使用 Go 序列跳转目标页面' },
         ],
       },
       {
@@ -617,6 +642,12 @@ function RootLayout() {
         label: '日历视图',
         icon: CalendarDays,
         to: '/calendar',
+      },
+      {
+        key: 'chat',
+        label: 'AI 对话',
+        icon: MessageSquare,
+        to: '/chat',
       },
       {
         key: 'settings',
@@ -680,10 +711,11 @@ export const router = createHashRouter([
       { index: true, element: <DashboardPage /> },
       { path: 'tasks', element: <TasksPage /> },
       { path: 'calendar', element: <CalendarPage /> },
+      { path: 'chat', element: <ChatPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
 ]);
 
-export type AppRoute = 'dashboard' | 'tasks' | 'calendar' | 'settings';
+export type AppRoute = 'dashboard' | 'tasks' | 'calendar' | 'chat' | 'settings';

@@ -171,6 +171,15 @@ impl AiService {
         }
     }
 
+    pub async fn chat(&self, message: String) -> AppResult<String> {
+        debug!(target: "app::ai", message_len = message.len(), "chat invoked");
+
+        self.refresh_configuration()?;
+        let provider = self.current_provider()?;
+
+        provider.chat(&message).await
+    }
+
     fn refresh_configuration(&self) -> AppResult<()> {
         let config = AiServiceConfig::load(&self.db_pool)?;
 
@@ -762,6 +771,97 @@ impl DeepSeekProvider {
                 ),
                 false,
             )
+        }
+    }
+
+    async fn chat(&self, message: &str) -> AppResult<String> {
+        let correlation_id = Uuid::new_v4().to_string();
+        
+        let request_body = json!({
+            "model": self.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "你是一个专业的任务管理和时间规划助手。你可以帮助用户提高工作效率、制定计划、解答问题。请用简洁、友好的方式回答用户的问题。"
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ],
+            "temperature": 0.7,
+            "max_tokens": 2000
+        });
+
+        debug!(
+            target: "app::ai::deepseek",
+            correlation_id = %correlation_id,
+            message_len = message.len(),
+            "invoking DeepSeek chat"
+        );
+
+        let start = Instant::now();
+        let response = self
+            .client
+            .post(&self.endpoint)
+            .bearer_auth(&self.api_key)
+            .json(&request_body)
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) => {
+                let status = resp.status();
+                let latency_ms = start.elapsed().as_millis();
+
+                if !status.is_success() {
+                    let (error, _) = Self::map_http_error(status, correlation_id.as_str());
+                    warn!(
+                        target: "app::ai::deepseek",
+                        correlation_id = %correlation_id,
+                        status = status.as_u16(),
+                        latency_ms,
+                        "DeepSeek chat returned non-success status"
+                    );
+                    return Err(error);
+                }
+
+                let body: JsonValue = resp.json().await.map_err(|err| {
+                    AppError::ai(
+                        AiErrorCode::InvalidResponse,
+                        format!("解析 DeepSeek 响应失败: {err}"),
+                    )
+                })?;
+
+                let content = body["choices"][0]["message"]["content"]
+                    .as_str()
+                    .ok_or_else(|| {
+                        AppError::ai(
+                            AiErrorCode::InvalidResponse,
+                            "DeepSeek 响应中缺少消息内容",
+                        )
+                    })?
+                    .to_string();
+
+                debug!(
+                    target: "app::ai::deepseek",
+                    correlation_id = %correlation_id,
+                    latency_ms,
+                    response_len = content.len(),
+                    "DeepSeek chat completed"
+                );
+
+                Ok(content)
+            }
+            Err(err) => {
+                let (error, _) = Self::error_from_reqwest(err, correlation_id.as_str());
+                warn!(
+                    target: "app::ai::deepseek",
+                    correlation_id = %correlation_id,
+                    "DeepSeek chat request failed"
+                );
+                Err(error)
+            }
         }
     }
 }

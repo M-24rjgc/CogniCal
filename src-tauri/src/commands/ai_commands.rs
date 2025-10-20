@@ -197,3 +197,63 @@ pub mod testing {
         ai_status_impl(app_state).await
     }
 }
+
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatRequest {
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ChatResponse {
+    pub message: String,
+    pub timestamp: String,
+}
+
+pub(crate) async fn ai_chat_impl(
+    app_state: &AppState,
+    request: ChatRequest,
+) -> CommandResult<ChatResponse> {
+    if request.message.trim().is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "消息内容不能为空",
+            None,
+        ));
+    }
+
+    debug!(
+        target: "app::command",
+        message_len = request.message.len(),
+        "ai_chat invoked"
+    );
+
+    let service = app_state.ai();
+    match service.chat(request.message).await {
+        Ok(response_text) => {
+            let response = ChatResponse {
+                message: response_text,
+                timestamp: chrono::Utc::now().to_rfc3339(),
+            };
+            debug!(
+                target: "app::command",
+                response_len = response.message.len(),
+                "ai_chat completed"
+            );
+            Ok(response)
+        }
+        Err(error) => {
+            warn!(target: "app::command", error = %error, "ai_chat failed");
+            Err(CommandError::from(error))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn ai_chat(
+    state: State<'_, AppState>,
+    message: String,
+) -> CommandResult<ChatResponse> {
+    ai_chat_impl(state.inner(), ChatRequest { message }).await
+}

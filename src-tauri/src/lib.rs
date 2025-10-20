@@ -53,6 +53,7 @@ fn try_run() -> Result<(), Box<dyn std::error::Error>> {
             crate::commands::ai_commands::ai_generate_recommendations,
             crate::commands::ai_commands::ai_plan_schedule,
             crate::commands::ai_commands::ai_status,
+            crate::commands::ai_commands::ai_chat,
             crate::commands::planning::planning_apply,
             crate::commands::planning::planning_generate,
             crate::commands::planning::planning_preferences_get,

@@ -238,6 +238,7 @@ const COMMANDS = {
   AI_STATUS: 'ai_status',
   AI_RECOMMENDATIONS: 'ai_generate_recommendations',
   AI_PLAN_SCHEDULE: 'ai_plan_schedule',
+  AI_CHAT: 'ai_chat',
   RECOMMENDATIONS_GENERATE: 'recommendations_generate',
   RECOMMENDATIONS_DECISION: 'recommendations_record_decision',
   PLANNING_GENERATE: 'planning_generate',
@@ -2425,5 +2426,40 @@ export const clearAllCache = async (): Promise<CacheClearResult> => {
     aiFeedbackCleared: 0,
     communityExportsCleared: 0,
     aiCacheCleared: 0,
+  };
+};
+
+export interface ChatResponse {
+  message: string;
+  timestamp: string;
+}
+
+export const chatWithAI = async (message: string): Promise<ChatResponse> => {
+  if (isTauriAvailable()) {
+    try {
+      const response = await invoke<ChatResponse>(COMMANDS.AI_CHAT, { message });
+      return response;
+    } catch (error) {
+      throw mapUnknownError(error);
+    }
+  }
+
+  warnMockUsage();
+
+  // Mock response in development
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  const mockResponses = [
+    '这是一个很好的问题！让我来帮你分析一下...',
+    '根据我的理解，我建议你可以尝试以下几个方法：\n\n1. 制定明确的目标\n2. 使用番茄工作法\n3. 定期回顾和调整',
+    '时间管理的关键在于优先级排序。你可以使用艾森豪威尔矩阵来区分重要和紧急的任务。',
+    '保持工作和生活的平衡很重要。建议你：\n- 设定明确的工作时间\n- 安排固定的休息时间\n- 培养工作之外的兴趣爱好',
+  ];
+
+  const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+
+  return {
+    message: randomResponse ?? '我理解你的问题，让我思考一下如何帮助你。',
+    timestamp: new Date().toISOString(),
   };
 };
