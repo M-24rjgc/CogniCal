@@ -232,3 +232,23 @@ CREATE TABLE IF NOT EXISTS community_exports (
 
 CREATE INDEX IF NOT EXISTS idx_community_exports_generated_at
     ON community_exports(generated_at);
+
+CREATE TABLE IF NOT EXISTS conversations (
+    id TEXT PRIMARY KEY,
+    user_id TEXT,
+    started_at TEXT NOT NULL,
+    last_message_at TEXT NOT NULL,
+    message_count INTEGER DEFAULT 0,
+    archived BOOLEAN DEFAULT FALSE
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_user_id
+    ON conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at
+    ON conversations(last_message_at);
+
+CREATE TABLE IF NOT EXISTS memory_config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);

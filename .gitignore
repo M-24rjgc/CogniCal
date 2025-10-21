@@ -83,3 +83,12 @@ coverage/
 
 # Spec workflow (internal workflow tool - uncomment to exclude)
 # .spec-workflow/
+
+# Embedded Python runtime (downloaded by setup script)
+# Uncomment the line below if you want to commit the embedded Python
+# (Not recommended - large files, platform-specific)
+resources/python/
+
+# Python setup artifacts
+python-embed.zip
+get-pip.py

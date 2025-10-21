@@ -13,18 +13,21 @@ use std::sync::Arc;
 
 use serde::Serialize;
 use serde_json::{Map as JsonMap, Value as JsonValue};
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::db::DbPool;
 use crate::error::{AppError, AppResult};
+use crate::services::ai_agent_service::AiAgentService;
 use crate::services::ai_service::AiService;
 use crate::services::analytics_service::AnalyticsService;
 use crate::services::community_service::CommunityService;
 use crate::services::feedback_service::FeedbackService;
+
 use crate::services::planning_service::PlanningService;
 use crate::services::productivity_score_service::ProductivityScoreService;
 use crate::services::settings_service::SettingsService;
 use crate::services::task_service::TaskService;
+use crate::services::tool_registry::ToolRegistry;
 use crate::services::wellness_service::WellnessService;
 use crate::services::workload_forecast_service::WorkloadForecastService;
 
@@ -41,6 +44,9 @@ pub struct AppState {
     workload_forecast_service: Arc<WorkloadForecastService>,
     feedback_service: Arc<FeedbackService>,
     pub community_service: CommunityService,
+
+    tool_registry: Arc<ToolRegistry>,
+    agent_service: Arc<AiAgentService>,
 }
 
 impl AppState {
@@ -73,6 +79,31 @@ impl AppState {
         ));
         let community_service = CommunityService::new(db_pool.clone());
 
+
+
+        // Initialize tool registry and register tools
+        let mut tool_registry = ToolRegistry::new();
+        
+        // Register task management tools
+        crate::tools::task_tools::register_task_tools(
+            &mut tool_registry,
+            Arc::clone(&task_service),
+        )?;
+        
+        // Register calendar tools
+        crate::tools::calendar_tools::register_calendar_tools(
+            &mut tool_registry,
+            db_pool.clone(),
+        )?;
+        
+        let tool_registry = Arc::new(tool_registry);
+
+        // Initialize AI agent service
+        let agent_service = Arc::new(AiAgentService::new(
+            Arc::clone(&ai_service),
+            Arc::clone(&tool_registry),
+        ));
+
         analytics_service.ensure_snapshot_job()?;
         wellness_service.ensure_nudge_job()?;
         workload_forecast_service.ensure_nightly_job()?;
@@ -89,6 +120,9 @@ impl AppState {
             workload_forecast_service,
             feedback_service,
             community_service,
+
+            tool_registry,
+            agent_service,
         })
     }
 
@@ -138,6 +172,16 @@ impl AppState {
 
     pub fn ai_service(&self) -> Arc<AiService> {
         Arc::clone(&self.ai_service)
+    }
+
+
+
+    pub fn tools(&self) -> Arc<ToolRegistry> {
+        Arc::clone(&self.tool_registry)
+    }
+
+    pub fn agent(&self) -> Arc<AiAgentService> {
+        Arc::clone(&self.agent_service)
     }
 
     /// Clear all cached data except settings
@@ -287,6 +331,41 @@ impl From<AppError> for CommandError {
                     Some(JsonValue::Object(merged))
                 };
                 CommandError::new(code.as_str(), message, detail_value)
+            }
+            AppError::MemoryUnavailable(message) => {
+                warn!(target: "app::command", %message, "memory unavailable in command");
+                CommandError::new(
+                    "MEMORY_UNAVAILABLE",
+                    format!("内存功能暂时不可用: {}", message),
+                    None,
+                )
+            }
+            AppError::ToolExecutionFailed { tool_name, reason } => {
+                error!(target: "app::command", %tool_name, %reason, "tool execution failed in command");
+                CommandError::new(
+                    "TOOL_EXECUTION_FAILED",
+                    format!("工具执行失败: {}", reason),
+                    Some(serde_json::json!({ "toolName": tool_name })),
+                )
+            }
+            AppError::InvalidToolCall {
+                tool_name,
+                validation_error,
+            } => {
+                warn!(target: "app::command", %tool_name, %validation_error, "invalid tool call in command");
+                CommandError::new(
+                    "INVALID_TOOL_CALL",
+                    format!("无效的工具调用: {}", validation_error),
+                    Some(serde_json::json!({ "toolName": tool_name })),
+                )
+            }
+            AppError::ContextTooLarge { tokens, limit } => {
+                warn!(target: "app::command", tokens, limit, "context too large in command");
+                CommandError::new(
+                    "CONTEXT_TOO_LARGE",
+                    format!("上下文过大 ({} tokens，限制 {} tokens)", tokens, limit),
+                    Some(serde_json::json!({ "tokens": tokens, "limit": limit })),
+                )
             }
             AppError::Database { message } => {
                 error!(target: "app::command", %message, "database error in command");

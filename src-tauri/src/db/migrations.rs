@@ -4,7 +4,7 @@ use tracing::info;
 use crate::error::AppResult;
 use crate::models::settings::DashboardConfig;
 
-const USER_VERSION: i32 = 6;
+const USER_VERSION: i32 = 7;
 const KEY_DASHBOARD_CONFIG: &str = "dashboard_config";
 
 pub fn run(conn: &Connection) -> AppResult<()> {
@@ -49,6 +49,13 @@ pub fn run(conn: &Connection) -> AppResult<()> {
         info!(target: "app::db", version = current_version, "running migration v6");
         migrate_to_v6(conn)?;
         current_version = 6;
+        conn.execute(&format!("PRAGMA user_version = {}", current_version), [])?;
+    }
+
+    if current_version < 7 {
+        info!(target: "app::db", version = current_version, "running migration v7");
+        migrate_to_v7(conn)?;
+        current_version = 7;
         conn.execute(&format!("PRAGMA user_version = {}", current_version), [])?;
     }
 
@@ -351,6 +358,33 @@ fn migrate_to_v6(conn: &Connection) -> AppResult<()> {
         ON CONFLICT(key) DO NOTHING
         "#,
         (KEY_DASHBOARD_CONFIG, default_value.as_str()),
+    )?;
+
+    Ok(())
+}
+
+fn migrate_to_v7(conn: &Connection) -> AppResult<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS conversations (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            started_at TEXT NOT NULL,
+            last_message_at TEXT NOT NULL,
+            message_count INTEGER DEFAULT 0,
+            archived BOOLEAN DEFAULT FALSE
+        );
+        CREATE INDEX IF NOT EXISTS idx_conversations_user_id
+            ON conversations(user_id);
+        CREATE INDEX IF NOT EXISTS idx_conversations_last_message_at
+            ON conversations(last_message_at);
+
+        CREATE TABLE IF NOT EXISTS memory_config (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        "#,
     )?;
 
     Ok(())

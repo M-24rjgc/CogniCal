@@ -165,8 +165,134 @@ pub async fn ai_status(state: State<'_, AppState>) -> CommandResult<AiStatusDto>
     ai_status_impl(state.inner()).await
 }
 
+// Agent chat structures
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AgentChatRequest {
+    pub conversation_id: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentChatResponse {
+    pub message: String,
+    pub tool_calls: Vec<serde_json::Value>,
+    pub memory_stored: bool,
+    pub metadata: AgentChatMetadata,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentChatMetadata {
+    pub tokens_used: std::collections::HashMap<String, u64>,
+    pub latency_ms: u128,
+    pub memory_entries_used: usize,
+    pub tools_executed: Vec<String>,
+}
+
+pub(crate) async fn ai_agent_chat_impl(
+    app_state: &AppState,
+    request: AgentChatRequest,
+) -> CommandResult<AgentChatResponse> {
+    if request.message.trim().is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "消息内容不能为空",
+            None,
+        ));
+    }
+
+    if request.conversation_id.trim().is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "会话ID不能为空",
+            None,
+        ));
+    }
+
+    debug!(
+        target: "app::command",
+        conversation_id = %request.conversation_id,
+        message_len = request.message.len(),
+        "ai_agent_chat invoked"
+    );
+
+    let agent_service = app_state.agent();
+    match agent_service
+        .chat(&request.conversation_id, &request.message)
+        .await
+    {
+        Ok(response) => {
+            debug!(
+                target: "app::command",
+                conversation_id = %request.conversation_id,
+                response_len = response.message.len(),
+                tools_executed = response.metadata.tools_executed.len(),
+                memory_stored = response.memory_stored,
+                "ai_agent_chat completed"
+            );
+
+            // Convert tool calls to JSON values for serialization
+            let tool_calls: Vec<serde_json::Value> = response
+                .tool_calls
+                .iter()
+                .map(|tc| {
+                    serde_json::json!({
+                        "id": tc.id,
+                        "name": tc.name,
+                        "arguments": tc.arguments,
+                    })
+                })
+                .collect();
+
+            Ok(AgentChatResponse {
+                message: response.message,
+                tool_calls,
+                memory_stored: response.memory_stored,
+                metadata: AgentChatMetadata {
+                    tokens_used: response.metadata.tokens_used,
+                    latency_ms: response.metadata.latency_ms,
+                    memory_entries_used: response.metadata.memory_entries_used,
+                    tools_executed: response.metadata.tools_executed,
+                },
+            })
+        }
+        Err(error) => {
+            warn!(
+                target: "app::command",
+                error = %error,
+                conversation_id = %request.conversation_id,
+                "ai_agent_chat failed"
+            );
+            Err(CommandError::from(error))
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn ai_agent_chat(
+    state: State<'_, AppState>,
+    conversation_id: String,
+    message: String,
+) -> CommandResult<AgentChatResponse> {
+    ai_agent_chat_impl(
+        state.inner(),
+        AgentChatRequest {
+            conversation_id,
+            message,
+        },
+    )
+    .await
+}
+
 pub mod testing {
     use super::*;
+
+    // Re-export request/response types for testing
+    pub use super::{
+        AgentChatRequest, AgentChatResponse, MemoryClearRequest, MemoryClearResponse,
+        MemoryExportRequest, MemoryExportResponse, MemorySearchRequest, MemorySearchResponse,
+    };
 
     /// Internal helper exposed for integration testing of command logic.
     pub async fn tasks_parse_ai(
@@ -195,6 +321,38 @@ pub mod testing {
     /// Internal helper exposed for integration testing of command logic.
     pub async fn ai_status(app_state: &AppState) -> CommandResult<AiStatusDto> {
         ai_status_impl(app_state).await
+    }
+
+    /// Internal helper exposed for integration testing of command logic.
+    pub async fn ai_agent_chat(
+        app_state: &AppState,
+        request: AgentChatRequest,
+    ) -> CommandResult<AgentChatResponse> {
+        ai_agent_chat_impl(app_state, request).await
+    }
+
+    /// Internal helper exposed for integration testing of memory search logic.
+    pub async fn memory_search(
+        app_state: &AppState,
+        request: MemorySearchRequest,
+    ) -> CommandResult<MemorySearchResponse> {
+        memory_search_impl(app_state, request).await
+    }
+
+    /// Internal helper exposed for integration testing of memory export logic.
+    pub async fn memory_export(
+        app_state: &AppState,
+        request: MemoryExportRequest,
+    ) -> CommandResult<MemoryExportResponse> {
+        memory_export_impl(app_state, request).await
+    }
+
+    /// Internal helper exposed for integration testing of memory clear logic.
+    pub async fn memory_clear(
+        app_state: &AppState,
+        request: MemoryClearRequest,
+    ) -> CommandResult<MemoryClearResponse> {
+        memory_clear_impl(app_state, request).await
     }
 }
 
@@ -251,9 +409,182 @@ pub(crate) async fn ai_chat_impl(
 }
 
 #[tauri::command]
-pub async fn ai_chat(
-    state: State<'_, AppState>,
-    message: String,
-) -> CommandResult<ChatResponse> {
+pub async fn ai_chat(state: State<'_, AppState>, message: String) -> CommandResult<ChatResponse> {
     ai_chat_impl(state.inner(), ChatRequest { message }).await
+}
+
+// Memory management structures and commands
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MemorySearchRequest {
+    pub query: String,
+    #[serde(default)]
+    pub filters: Option<std::collections::HashMap<String, String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemorySearchResponse {
+    pub entries: Vec<MemoryEntryDto>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryEntryDto {
+    pub id: String,
+    pub conversation_id: String,
+    pub user_message: String,
+    pub assistant_message: String,
+    pub timestamp: String,
+    pub metadata: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MemoryExportRequest {
+    pub path: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryExportResponse {
+    pub success: bool,
+    pub path: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MemoryClearRequest {
+    pub conversation_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryClearResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+
+
+// Memory command implementations
+
+pub(crate) async fn memory_search_impl(
+    _app_state: &AppState,
+    request: MemorySearchRequest,
+) -> CommandResult<MemorySearchResponse> {
+    if request.query.trim().is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "搜索查询不能为空",
+            None,
+        ));
+    }
+
+    debug!(
+        target: "app::command",
+        query = %request.query,
+        "memory_search invoked"
+    );
+
+    // Memory service is currently unavailable - return empty results
+    warn!(
+        target: "app::command",
+        query = %request.query,
+        "Memory service unavailable, returning empty results"
+    );
+    
+    Ok(MemorySearchResponse {
+        entries: Vec::new(),
+    })
+}
+
+pub(crate) async fn memory_export_impl(
+    _app_state: &AppState,
+    request: MemoryExportRequest,
+) -> CommandResult<MemoryExportResponse> {
+    if request.path.trim().is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "导出路径不能为空",
+            None,
+        ));
+    }
+
+    debug!(
+        target: "app::command",
+        path = %request.path,
+        "memory_export invoked"
+    );
+
+    // Memory service is currently unavailable
+    warn!(
+        target: "app::command",
+        path = %request.path,
+        "Memory service unavailable, cannot export"
+    );
+    
+    Err(CommandError::new(
+        "MEMORY_UNAVAILABLE",
+        "记忆服务当前不可用，无法导出数据",
+        None,
+    ))
+}
+
+pub(crate) async fn memory_clear_impl(
+    _app_state: &AppState,
+    request: MemoryClearRequest,
+) -> CommandResult<MemoryClearResponse> {
+    if request.conversation_id.trim().is_empty() {
+        return Err(CommandError::new(
+            "VALIDATION_ERROR",
+            "会话ID不能为空",
+            None,
+        ));
+    }
+
+    debug!(
+        target: "app::command",
+        conversation_id = %request.conversation_id,
+        "memory_clear invoked"
+    );
+
+    // Memory service is currently unavailable
+    warn!(
+        target: "app::command",
+        conversation_id = %request.conversation_id,
+        "Memory service unavailable, cannot clear memory"
+    );
+    
+    Err(CommandError::new(
+        "MEMORY_UNAVAILABLE",
+        "记忆服务当前不可用，无法清除记忆数据",
+        None,
+    ))
+}
+
+// Tauri command wrappers for memory operations
+
+#[tauri::command]
+pub async fn memory_search(
+    state: State<'_, AppState>,
+    query: String,
+    filters: Option<std::collections::HashMap<String, String>>,
+) -> CommandResult<MemorySearchResponse> {
+    memory_search_impl(state.inner(), MemorySearchRequest { query, filters }).await
+}
+
+#[tauri::command]
+pub async fn memory_export(
+    state: State<'_, AppState>,
+    path: String,
+) -> CommandResult<MemoryExportResponse> {
+    memory_export_impl(state.inner(), MemoryExportRequest { path }).await
+}
+
+#[tauri::command]
+pub async fn memory_clear(
+    state: State<'_, AppState>,
+    conversation_id: String,
+) -> CommandResult<MemoryClearResponse> {
+    memory_clear_impl(state.inner(), MemoryClearRequest { conversation_id }).await
 }

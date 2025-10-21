@@ -67,6 +67,21 @@ pub enum AppError {
         details: Option<JsonValue>,
     },
 
+    #[error("内存服务不可用: {0}")]
+    MemoryUnavailable(String),
+
+    #[error("工具执行失败: {tool_name} - {reason}")]
+    ToolExecutionFailed { tool_name: String, reason: String },
+
+    #[error("无效的工具调用: {tool_name} - {validation_error}")]
+    InvalidToolCall {
+        tool_name: String,
+        validation_error: String,
+    },
+
+    #[error("上下文过大: {tokens} tokens (限制: {limit})")]
+    ContextTooLarge { tokens: usize, limit: usize },
+
     #[error("序列化错误: {0}")]
     Serialization(#[from] serde_json::Error),
 
@@ -186,6 +201,37 @@ impl AppError {
         let message = message.into();
         error!(target: "app::other", %message, "other error");
         AppError::Other(message)
+    }
+
+    pub fn memory_unavailable(message: impl Into<String>) -> Self {
+        let message = message.into();
+        warn!(target: "app::memory", %message, "memory service unavailable");
+        AppError::MemoryUnavailable(message)
+    }
+
+    pub fn tool_execution_failed(tool_name: impl Into<String>, reason: impl Into<String>) -> Self {
+        let tool_name = tool_name.into();
+        let reason = reason.into();
+        error!(target: "app::tool", %tool_name, %reason, "tool execution failed");
+        AppError::ToolExecutionFailed { tool_name, reason }
+    }
+
+    pub fn invalid_tool_call(
+        tool_name: impl Into<String>,
+        validation_error: impl Into<String>,
+    ) -> Self {
+        let tool_name = tool_name.into();
+        let validation_error = validation_error.into();
+        warn!(target: "app::tool", %tool_name, %validation_error, "invalid tool call");
+        AppError::InvalidToolCall {
+            tool_name,
+            validation_error,
+        }
+    }
+
+    pub fn context_too_large(tokens: usize, limit: usize) -> Self {
+        warn!(target: "app::context", tokens, limit, "context too large");
+        AppError::ContextTooLarge { tokens, limit }
     }
 }
 

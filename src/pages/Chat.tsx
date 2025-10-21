@@ -6,34 +6,46 @@ import {
   Send,
   Sparkles,
   Trash2,
-  User,
   AlertCircle,
   Settings2,
+  Download,
+  Search,
+  Activity,
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useChatStore } from '../stores/chatStore';
-import { cn } from '../lib/utils';
+import { MessageBubble } from '../components/chat/MessageBubble';
+import { MemorySearchDialog } from '../components/chat/MemorySearchDialog';
+
 
 export default function ChatPage() {
   const [input, setInput] = useState('');
+  const [showMetrics, setShowMetrics] = useState(false);
+  const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const hasDeepseekKey = useSettingsStore((state) => state.settings?.hasDeepseekKey ?? false);
   const {
     messages,
+    toolCalls,
     isLoading,
     error,
     sendMessage,
     clearMessages,
     clearError,
+    searchConversations,
+    exportConversation,
   } = useChatStore();
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
+
+
 
   useEffect(() => {
     scrollToBottom();
@@ -77,6 +89,20 @@ export default function ChatPage() {
     }
   };
 
+  const handleExportConversation = async () => {
+    try {
+      const exportPath = await exportConversation();
+      alert(`对话已导出到: ${exportPath}`);
+    } catch (error) {
+      console.error('Failed to export conversation:', error);
+      alert('导出对话失败，请稍后重试');
+    }
+  };
+
+  const handleSearchConversations = async (query: string) => {
+    return await searchConversations(query);
+  };
+
   return (
     <section className="flex h-full flex-1 flex-col gap-6">
       {/* 头部 */}
@@ -100,6 +126,33 @@ export default function ChatPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowMetrics(!showMetrics)}
+              title={showMetrics ? '隐藏性能指标' : '显示性能指标'}
+            >
+              <Activity className="mr-2 h-4 w-4" />
+              {showMetrics ? '隐藏指标' : '显示指标'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSearchDialogOpen(true)}
+              disabled={messages.length === 0}
+            >
+              <Search className="mr-2 h-4 w-4" />
+              搜索历史
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportConversation}
+              disabled={messages.length === 0}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              导出对话
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -134,6 +187,19 @@ export default function ChatPage() {
           <Button asChild size="sm" variant="outline" className="border-amber-500/40">
             <Link to="/settings">前往配置</Link>
           </Button>
+        </div>
+      )}
+
+      {/* 记忆服务不可用提示 */}
+      {messages.length > 0 && messages[messages.length - 1]?.metadata?.memoryAvailable === false && (
+        <div className="flex items-center gap-3 rounded-2xl border border-blue-500/40 bg-blue-500/10 p-4 text-sm text-blue-700">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <div className="flex-1">
+            <span className="font-semibold">记忆服务当前不可用</span>
+            <p className="text-xs text-blue-600 mt-1">
+              AI 正在无状态模式下运行，无法记住之前的对话。您仍然可以进行对话和使用工具，但功能将受到限制。
+            </p>
+          </div>
         </div>
       )}
 
@@ -186,9 +252,22 @@ export default function ChatPage() {
             </div>
           ) : (
             <>
-              {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} />
-              ))}
+              {messages.map((message, index) => {
+                // Get tool calls for this message if it's the last assistant message
+                const isLastAssistantMessage = 
+                  message.role === 'assistant' && 
+                  index === messages.length - 1;
+                const messageToolCalls = isLastAssistantMessage ? toolCalls : [];
+                
+                return (
+                  <MessageBubble 
+                    key={message.id} 
+                    message={message}
+                    toolCalls={messageToolCalls}
+                    showMetrics={showMetrics}
+                  />
+                );
+              })}
               {isLoading && (
                 <div className="flex items-start gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
@@ -254,66 +333,13 @@ export default function ChatPage() {
           </Button>
         </form>
       </div>
+
+      {/* Memory Search Dialog */}
+      <MemorySearchDialog
+        isOpen={isSearchDialogOpen}
+        onClose={() => setIsSearchDialogOpen(false)}
+        onSearch={handleSearchConversations}
+      />
     </section>
-  );
-}
-
-interface MessageBubbleProps {
-  message: {
-    id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    timestamp: string;
-  };
-}
-
-function MessageBubble({ message }: MessageBubbleProps) {
-  const isUser = message.role === 'user';
-  const time = new Date(message.timestamp).toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  return (
-    <div
-      className={cn(
-        'flex items-start gap-3',
-        isUser && 'flex-row-reverse',
-      )}
-    >
-      {/* 头像 */}
-      <div
-        className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-primary/10 text-primary',
-        )}
-      >
-        {isUser ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
-      </div>
-
-      {/* 消息内容 */}
-      <div
-        className={cn(
-          'flex-1 space-y-1',
-          isUser && 'flex flex-col items-end',
-        )}
-      >
-        <div
-          className={cn(
-            'inline-block max-w-[85%] rounded-2xl border px-4 py-3',
-            isUser
-              ? 'border-primary/40 bg-primary/10 text-foreground'
-              : 'border-border/60 bg-background/80 text-foreground',
-          )}
-        >
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">
-            {message.content}
-          </p>
-        </div>
-        <span className="text-xs text-muted-foreground">{time}</span>
-      </div>
-    </div>
   );
 }

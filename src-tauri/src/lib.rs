@@ -3,6 +3,7 @@ pub mod db;
 pub mod error;
 pub mod models;
 pub mod services;
+pub mod tools;
 pub mod utils;
 
 use tauri::Manager;
@@ -54,6 +55,9 @@ fn try_run() -> Result<(), Box<dyn std::error::Error>> {
             crate::commands::ai_commands::ai_plan_schedule,
             crate::commands::ai_commands::ai_status,
             crate::commands::ai_commands::ai_chat,
+            crate::commands::ai_commands::ai_agent_chat,
+
+
             crate::commands::planning::planning_apply,
             crate::commands::planning::planning_generate,
             crate::commands::planning::planning_preferences_get,

@@ -239,6 +239,7 @@ const COMMANDS = {
   AI_RECOMMENDATIONS: 'ai_generate_recommendations',
   AI_PLAN_SCHEDULE: 'ai_plan_schedule',
   AI_CHAT: 'ai_chat',
+  AI_AGENT_CHAT: 'ai_agent_chat',
   RECOMMENDATIONS_GENERATE: 'recommendations_generate',
   RECOMMENDATIONS_DECISION: 'recommendations_record_decision',
   PLANNING_GENERATE: 'planning_generate',
@@ -2463,3 +2464,152 @@ export const chatWithAI = async (message: string): Promise<ChatResponse> => {
     timestamp: new Date().toISOString(),
   };
 };
+
+export interface ErrorDetail {
+  errorType: string;
+  message: string;
+  timestamp: string;
+  context?: Record<string, string>;
+}
+
+export interface AgentChatMetadata {
+  tokensUsed: Record<string, number>;
+  latencyMs: number;
+  memoryEntriesUsed: number;
+  toolsExecuted: string[];
+  correlationId?: string;
+  errors?: ErrorDetail[];
+  memoryAvailable?: boolean;
+}
+
+export interface AgentChatResponse {
+  message: string;
+  toolCalls: unknown[];
+  memoryStored: boolean;
+  metadata: AgentChatMetadata;
+}
+
+export const chatWithAgent = async (
+  conversationId: string,
+  message: string,
+): Promise<AgentChatResponse> => {
+  if (isTauriAvailable()) {
+    try {
+      const response = await invoke<AgentChatResponse>(COMMANDS.AI_AGENT_CHAT, {
+        conversationId,
+        message,
+      });
+      return response;
+    } catch (error) {
+      throw mapUnknownError(error);
+    }
+  }
+
+  warnMockUsage();
+
+  // Mock response in development
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+
+  const mockResponses = [
+    '这是一个很好的问题！让我来帮你分析一下...',
+    '根据我的理解，我建议你可以尝试以下几个方法：\n\n1. 制定明确的目标\n2. 使用番茄工作法\n3. 定期回顾和调整',
+    '时间管理的关键在于优先级排序。你可以使用艾森豪威尔矩阵来区分重要和紧急的任务。',
+    '保持工作和生活的平衡很重要。建议你：\n- 设定明确的工作时间\n- 安排固定的休息时间\n- 培养工作之外的兴趣爱好',
+  ];
+
+  const randomResponse = mockResponses[Math.floor(Math.random() * mockResponses.length)];
+
+  return {
+    message: randomResponse ?? '我理解你的问题，让我思考一下如何帮助你。',
+    toolCalls: [],
+    memoryStored: false,
+    metadata: {
+      tokensUsed: { prompt: 100, completion: 50 },
+      latencyMs: 1000,
+      memoryEntriesUsed: 0,
+      toolsExecuted: [],
+    },
+  };
+};
+
+export interface MemorySearchResult {
+  conversationId: string;
+  userMessage: string;
+  assistantMessage: string;
+  timestamp: string;
+  relevanceScore: number;
+}
+
+export const searchConversations = async (query: string): Promise<MemorySearchResult[]> => {
+  if (isTauriAvailable()) {
+    try {
+      const response = await invoke<MemorySearchResult[]>('memory_search', { query });
+      return response;
+    } catch (error) {
+      throw mapUnknownError(error);
+    }
+  }
+
+  warnMockUsage();
+  return [];
+};
+
+export const exportConversation = async (conversationId: string): Promise<string> => {
+  if (isTauriAvailable()) {
+    try {
+      const response = await invoke<{ path: string }>('memory_export', { conversationId });
+      return response.path;
+    } catch (error) {
+      throw mapUnknownError(error);
+    }
+  }
+
+  warnMockUsage();
+  return '/mock/export/path.json';
+};
+
+export const clearConversation = async (conversationId: string): Promise<void> => {
+  if (isTauriAvailable()) {
+    try {
+      await invoke('memory_clear', { conversationId });
+    } catch (error) {
+      throw mapUnknownError(error);
+    }
+  }
+
+  warnMockUsage();
+};
+
+
+
+
+
+export interface InitializeKnowledgeBaseResponse {
+  success: boolean;
+  kbPath: string;
+  message: string;
+}
+
+export const initializeKnowledgeBase = async (
+  kbPath?: string,
+): Promise<InitializeKnowledgeBaseResponse> => {
+  if (isTauriAvailable()) {
+    try {
+      const response = await invoke<InitializeKnowledgeBaseResponse>('initialize_knowledge_base', {
+        kbPath,
+      });
+      return response;
+    } catch (error) {
+      throw mapUnknownError(error);
+    }
+  }
+
+  warnMockUsage();
+  return {
+    success: true,
+    kbPath: '/mock/knowledge_base',
+    message: 'Mock mode - knowledge base initialized',
+  };
+};
+
+

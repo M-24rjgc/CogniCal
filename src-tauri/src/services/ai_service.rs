@@ -258,6 +258,17 @@ impl AiService {
 
         parsed.reasoning.metadata = Some(metadata);
     }
+
+    /// Get the API key for direct API calls
+    pub fn get_api_key(&self) -> AppResult<String> {
+        let config = self.config.read().unwrap();
+        config.api_key.clone().ok_or_else(|| {
+            AppError::ai(
+                AiErrorCode::MissingApiKey,
+                "DeepSeek API 密钥未配置。请在设置中配置 API 密钥。"
+            )
+        })
+    }
 }
 
 impl AiServiceConfig {

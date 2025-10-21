@@ -25,6 +25,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import type { AiStatus, ThemePreference, UpdateAppSettingsInput } from '../types/settings';
 import { isAppError, type AppError } from '../services/tauriApi';
 import DashboardSettingsForm from '../components/settings/DashboardSettingsForm';
+
 import { HelpPopover } from '../components/help/HelpPopover';
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -562,6 +563,8 @@ export default function SettingsPage() {
             </Card>
 
             <DashboardSettingsForm />
+
+
           </div>
 
           <aside className="flex flex-col gap-4">

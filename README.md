@@ -37,6 +37,13 @@ CogniCal 是一款基于 Tauri、React 和 TypeScript 构建的桌面应用,将�
 - **Exponential Backoff**: Smart nudge frequency adjustment
 - **Weekly Summaries**: Compliance rates and rhythm analysis
 
+### 🤖 AI Agent with Memory
+
+- **Long-term Memory**: Semantic search-powered conversation history
+- **Tool Calling**: Natural language task and calendar management
+- **Context Awareness**: Remembers preferences and past discussions
+- **Multi-turn Conversations**: Complex workflows through dialogue
+
 ### 🔒 Privacy-First AI Feedback
 
 - **👍/👎 Sentiment Capture**: Contextual feedback on AI features
@@ -68,6 +75,9 @@ CogniCal 是一款基于 Tauri、React 和 TypeScript 构建的桌面应用,将�
 - `WellnessService` - Proactive balance monitoring
 - `FeedbackService` - Privacy-first AI feedback
 - `CommunityService` - Transparency and export
+- `AiAgentService` - Memory-enhanced AI with tool calling
+- `MemoryService` - Semantic conversation storage and retrieval
+- `ToolRegistry` - Dynamic tool registration and execution
 
 ## 📦 Installation
 
@@ -76,6 +86,8 @@ CogniCal 是一款基于 Tauri、React 和 TypeScript 构建的桌面应用,将�
 - Node.js 18+
 - Rust 1.70+
 - Tauri CLI
+- Python 3.8+ (for AI Agent memory features)
+
 
 ### Quick Start
 
@@ -87,9 +99,41 @@ cd cognical
 # Install dependencies
 pnpm install
 
+
+
 # Build and run
 pnpm tauri dev
 ```
+
+### AI Agent Setup
+
+#### Option 1: Embedded Python (Recommended)
+
+**Zero configuration** - Python runtime is bundled with the app:
+
+```bash
+# One-time setup for development
+.\setup_python.ps1
+
+# Then run normally
+pnpm tauri dev
+```
+
+For production builds, the embedded Python is automatically included.
+
+#### Option 2: System Python (Advanced)
+
+If you prefer to use your system Python:
+
+
+
+2. **Verify installation**:
+   - Launch CogniCal
+   - Go to Settings > AI Agent
+   - Check "Memory Status" indicator
+   - If green, memory features are active
+
+**Note**: The AI Agent works without memory features but will operate in stateless mode (no conversation history).
 
 ### Development
 
@@ -139,8 +183,18 @@ pnpm test:performance
 ### Environment Variables
 
 ```bash
-# DeepSeek API (optional)
+# DeepSeek API (required for AI features)
 DEEPSEEK_API_KEY=your_api_key
+
+# AI Agent Memory Configuration (optional)
+COGNICAL_KB_PATH=/path/to/knowledge_base    # Default: ~/.cognical/knowledge_base
+
+COGNICAL_MEMORY_SEARCH_LIMIT=10              # Max search results
+COGNICAL_MEMORY_ENABLE_GRAPH=true            # Enable knowledge graph
+
+# Tool Configuration (optional)
+COGNICAL_TOOLS_ENABLED=true                  # Enable/disable tool calling
+COGNICAL_TOOLS_TIMEOUT_MS=5000               # Tool execution timeout
 
 # Development flags
 TAURI_DEV=true
@@ -149,10 +203,21 @@ RUST_LOG=info
 
 ## 📚 Documentation
 
+### User Documentation
+- [AI Agent User Guide](./docs/AI_AGENT_USER_GUIDE.md) - Complete guide to using AI Agent features
+- [Chat Feature Guide](./docs/CHAT_FEATURE.md) - Basic chat functionality
+- [Calendar Feature Guide](./docs/CALENDAR_FEATURE.md) - Calendar management
+
+### Developer Documentation
+- [AI Agent Developer Guide](./docs/AI_AGENT_DEVELOPER_GUIDE.md) - Extending the AI Agent with custom tools
 - [Phase 4 Architecture](./docs/architecture/phase4.md) - System design and data flows
 - [Type System Integration](./docs/phase4-type-system-integration.md) - API contracts and interfaces
 - [Test Coverage Report](./docs/PHASE4_TEST_COVERAGE.md) - Quality assurance details
 - [Smoke Checklist](./docs/SMOKE-CHECKLIST.md) - Release verification steps
+
+### Specifications
+- [AI Agent Requirements](./kiro/specs/ai-agent-with-memory/requirements.md) - Feature requirements
+- [AI Agent Design](./kiro/specs/ai-agent-with-memory/design.md) - Architecture and design decisions
 
 ## 🤝 Contributing
 
