@@ -92,3 +92,14 @@ resources/python/
 # Python setup artifacts
 python-embed.zip
 get-pip.py
+
+# Rust build artifacts
+target/
+
+# User data and exports (runtime generated)
+src-tauri/data/
+src-tauri/exports/
+src-tauri/knowledge_base/
+
+# Test artifacts
+src-tauri/tests/*.png
