@@ -18,9 +18,8 @@ async fn create_test_agent_service() -> (AiAgentService, TempDir) {
     let db_pool = DbPool::new(&db_path).expect("Failed to create db pool");
 
     // Create AI service
-    let ai_service = Arc::new(AiService::new(db_pool.clone()).expect("Failed to create AI service"));
-
-
+    let ai_service =
+        Arc::new(AiService::new(db_pool.clone()).expect("Failed to create AI service"));
 
     // Create tool registry
     let tool_registry = Arc::new(ToolRegistry::new());
@@ -44,6 +43,7 @@ async fn test_agent_context_structure() {
         conversation_id: "test_conv".to_string(),
         available_tools: vec![],
         system_prompt: "Test prompt".to_string(),
+        history_messages: vec![],
     };
 
     assert_eq!(context.conversation_id, "test_conv");

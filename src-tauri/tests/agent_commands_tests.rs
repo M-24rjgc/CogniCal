@@ -10,7 +10,11 @@ fn init_state() -> (TempDir, AppState) {
     let dir = tempfile::tempdir().expect("temp dir");
     let db_path = dir.path().join("agent-tests.sqlite");
     let pool = DbPool::new(&db_path).expect("db pool");
-    let state = AppState::new(pool).expect("app state");
+    
+    // Use temp directory as memory base directory for testing
+    let memory_base_dir = dir.path().to_path_buf();
+    
+    let state = AppState::new(pool, memory_base_dir).expect("app state");
     (dir, state)
 }
 

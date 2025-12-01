@@ -469,7 +469,7 @@ pub struct MemoryClearResponse {
 // Memory command implementations
 
 pub(crate) async fn memory_search_impl(
-    _app_state: &AppState,
+    app_state: &AppState,
     request: MemorySearchRequest,
 ) -> CommandResult<MemorySearchResponse> {
     if request.query.trim().is_empty() {
@@ -486,20 +486,97 @@ pub(crate) async fn memory_search_impl(
         "memory_search invoked"
     );
 
-    // Memory service is currently unavailable - return empty results
-    warn!(
-        target: "app::command",
-        query = %request.query,
-        "Memory service unavailable, returning empty results"
-    );
+    let memory_service = app_state.memory();
+    match memory_service.search_memory(&request.query, 10).await {
+        Ok(context) => {
+            let entries: Vec<MemoryEntryDto> = context.relevant_documents
+                .into_iter()
+                .map(|doc| {
+                    // Parse the document content to extract user and assistant messages
+                    let (user_message, assistant_message) = parse_conversation_content(&doc.content);
+                    
+                    MemoryEntryDto {
+                        id: doc.id,
+                        conversation_id: doc.metadata.conversation_id,
+                        user_message,
+                        assistant_message,
+                        timestamp: doc.created_at.to_rfc3339(),
+                        metadata: std::collections::HashMap::from([
+                            ("topics".to_string(), doc.metadata.topics.join(", ")),
+                            ("summary".to_string(), doc.metadata.summary),
+                            ("relevance_score".to_string(), doc.metadata.relevance_score.to_string()),
+                        ]),
+                    }
+                })
+                .collect();
+
+            debug!(
+                target: "app::command",
+                query = %request.query,
+                results_count = entries.len(),
+                "memory_search completed"
+            );
+
+            Ok(MemorySearchResponse { entries })
+        }
+        Err(error) => {
+            warn!(
+                target: "app::command",
+                error = %error,
+                query = %request.query,
+                "memory_search failed"
+            );
+            Err(CommandError::from(error))
+        }
+    }
+}
+
+/// Parse conversation content to extract user and assistant messages
+fn parse_conversation_content(content: &str) -> (String, String) {
+    let mut user_message = String::new();
+    let mut assistant_message = String::new();
     
-    Ok(MemorySearchResponse {
-        entries: Vec::new(),
-    })
+    let lines: Vec<&str> = content.lines().collect();
+    let mut current_section = "";
+    
+    for line in lines {
+        if line.starts_with("## User Message") {
+            current_section = "user";
+            continue;
+        } else if line.starts_with("## AI Response") {
+            current_section = "assistant";
+            continue;
+        } else if line.starts_with("##") {
+            current_section = "";
+            continue;
+        }
+        
+        match current_section {
+            "user" => {
+                if !line.trim().is_empty() {
+                    if !user_message.is_empty() {
+                        user_message.push('\n');
+                    }
+                    user_message.push_str(line);
+                }
+            }
+            "assistant" => {
+                if !line.trim().is_empty() {
+                    if !assistant_message.is_empty() {
+                        assistant_message.push('\n');
+                    }
+                    assistant_message.push_str(line);
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    (user_message, assistant_message)
 }
 
 pub(crate) async fn memory_export_impl(
-    _app_state: &AppState,
+    app_state: &AppState,
     request: MemoryExportRequest,
 ) -> CommandResult<MemoryExportResponse> {
     if request.path.trim().is_empty() {
@@ -516,22 +593,45 @@ pub(crate) async fn memory_export_impl(
         "memory_export invoked"
     );
 
-    // Memory service is currently unavailable
-    warn!(
-        target: "app::command",
-        path = %request.path,
-        "Memory service unavailable, cannot export"
-    );
-    
-    Err(CommandError::new(
-        "MEMORY_UNAVAILABLE",
-        "记忆服务当前不可用，无法导出数据",
-        None,
-    ))
+    let memory_service = app_state.memory();
+    let export_options = crate::models::memory::MemoryExportOptions {
+        output_path: std::path::PathBuf::from(&request.path),
+        format: crate::models::memory::MemoryExportFormat::Archive,
+        date_range: None,
+        include_metadata: true,
+    };
+
+    match memory_service.export_memory_archive(&export_options).await {
+        Ok(()) => {
+            debug!(
+                target: "app::command",
+                path = %request.path,
+                "memory_export completed successfully"
+            );
+            Ok(MemoryExportResponse {
+                success: true,
+                path: request.path,
+                message: "记忆数据导出成功".to_string(),
+            })
+        }
+        Err(error) => {
+            warn!(
+                target: "app::command",
+                error = %error,
+                path = %request.path,
+                "memory_export failed"
+            );
+            Ok(MemoryExportResponse {
+                success: false,
+                path: request.path,
+                message: format!("导出失败: {}", error),
+            })
+        }
+    }
 }
 
 pub(crate) async fn memory_clear_impl(
-    _app_state: &AppState,
+    app_state: &AppState,
     request: MemoryClearRequest,
 ) -> CommandResult<MemoryClearResponse> {
     if request.conversation_id.trim().is_empty() {
@@ -548,18 +648,61 @@ pub(crate) async fn memory_clear_impl(
         "memory_clear invoked"
     );
 
-    // Memory service is currently unavailable
-    warn!(
-        target: "app::command",
-        conversation_id = %request.conversation_id,
-        "Memory service unavailable, cannot clear memory"
-    );
+    let memory_service = app_state.memory();
     
-    Err(CommandError::new(
-        "MEMORY_UNAVAILABLE",
-        "记忆服务当前不可用，无法清除记忆数据",
-        None,
-    ))
+    // Get documents for this conversation
+    match memory_service.search_by_conversation_id(&request.conversation_id).await {
+        Ok(documents) => {
+            let mut cleared_count = 0;
+            
+            // Remove each document
+            for doc in documents {
+                if let Err(e) = std::fs::remove_file(&doc.file_path) {
+                    warn!(
+                        target: "app::command",
+                        error = %e,
+                        file_path = ?doc.file_path,
+                        "Failed to remove memory file"
+                    );
+                } else {
+                    cleared_count += 1;
+                }
+            }
+            
+            // Rebuild index to reflect changes
+            if let Err(e) = memory_service.rebuild_index() {
+                warn!(
+                    target: "app::command",
+                    error = %e,
+                    "Failed to rebuild memory index after clearing"
+                );
+            }
+
+            debug!(
+                target: "app::command",
+                conversation_id = %request.conversation_id,
+                cleared_count = cleared_count,
+                "memory_clear completed"
+            );
+
+            Ok(MemoryClearResponse {
+                success: true,
+                message: format!("已清除 {} 条记忆记录", cleared_count),
+            })
+        }
+        Err(error) => {
+            warn!(
+                target: "app::command",
+                error = %error,
+                conversation_id = %request.conversation_id,
+                "memory_clear failed"
+            );
+            Ok(MemoryClearResponse {
+                success: false,
+                message: format!("清除记忆失败: {}", error),
+            })
+        }
+    }
 }
 
 // Tauri command wrappers for memory operations

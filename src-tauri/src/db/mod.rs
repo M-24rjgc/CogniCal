@@ -7,7 +7,7 @@ use tracing::{debug, info};
 
 use crate::error::AppResult;
 
-mod migrations;
+pub mod migrations;
 
 pub mod repositories;
 

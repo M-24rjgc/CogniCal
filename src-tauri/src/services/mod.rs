@@ -5,16 +5,24 @@ pub mod analytics_service;
 pub mod behavior_learning;
 pub mod cache_service;
 pub mod community_service;
+pub mod dependency_service;
 pub mod feedback_service;
-
+pub mod goal_service;
+pub mod instance_generator;
+pub mod memory_service;
 pub mod planning_service;
 pub mod productivity_score_service;
 pub mod prompt_templates;
+pub mod recurring_task_service;
 // pub mod recommendation_orchestrator; // Removed - recommendation feature deleted
+pub mod rrule_parser;
 pub mod schedule_optimizer;
+pub mod schedule_service;
 pub mod schedule_utils;
+pub mod session_metrics;
 pub mod settings_service;
 pub mod streaming;
+pub mod task_instance_service;
 pub mod task_service;
 pub mod tool_registry;
 pub mod wellness_service;

@@ -108,6 +108,7 @@ struct GetCalendarEventsParams {
     start_date: String,
     end_date: String,
     #[serde(default)]
+    #[allow(dead_code)] // Reserved for future filtering by event type
     event_type: Option<String>,
 }
 
@@ -140,9 +141,8 @@ struct UpdateCalendarEventParams {
 
 /// Helper function to extract parameters from JSON
 fn extract_params<T: for<'de> Deserialize<'de>>(args: &JsonValue) -> AppResult<T> {
-    serde_json::from_value(args.clone()).map_err(|e| {
-        AppError::validation(format!("Failed to parse tool parameters: {}", e))
-    })
+    serde_json::from_value(args.clone())
+        .map_err(|e| AppError::validation(format!("Failed to parse tool parameters: {}", e)))
 }
 
 /// Parse date string (YYYY-MM-DD) into NaiveDate
@@ -169,23 +169,20 @@ fn parse_time(time_str: &str) -> AppResult<NaiveTime> {
 fn combine_datetime(date: NaiveDate, time: NaiveTime) -> AppResult<String> {
     let local_tz = FixedOffset::east_opt(8 * 3600)
         .ok_or_else(|| AppError::validation("Failed to create timezone offset"))?;
-    
+
     let naive_dt = date.and_time(time);
     let dt = local_tz
         .from_local_datetime(&naive_dt)
         .single()
         .ok_or_else(|| AppError::validation("Ambiguous or invalid local datetime"))?;
-    
+
     Ok(dt.to_rfc3339())
 }
 
 /// Parse RFC3339 datetime string
 fn parse_datetime(datetime_str: &str) -> AppResult<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(datetime_str).map_err(|e| {
-        AppError::validation(format!(
-            "Invalid datetime format '{}': {}",
-            datetime_str, e
-        ))
+        AppError::validation(format!("Invalid datetime format '{}': {}", datetime_str, e))
     })
 }
 
@@ -210,29 +207,26 @@ fn format_event_for_ai(event: &ExistingEvent) -> JsonValue {
 }
 
 /// Helper function to format multiple events for AI consumption
+#[allow(dead_code)] // Reserved for future use with ExistingEvent types
 fn format_events_summary(events: &[ExistingEvent]) -> String {
     if events.is_empty() {
         return "No events found in the specified date range.".to_string();
     }
 
     let mut summary = format!("Found {} event(s):\n\n", events.len());
-    
+
     for (idx, event) in events.iter().enumerate() {
         let start_display = format_datetime_display(&event.start_at);
         let end_display = format_datetime_display(&event.end_at);
-        
-        summary.push_str(&format!(
-            "{}. Event ID: {}\n",
-            idx + 1,
-            event.id
-        ));
-        
+
+        summary.push_str(&format!("{}. Event ID: {}\n", idx + 1, event.id));
+
         summary.push_str(&format!("   Time: {} to {}\n", start_display, end_display));
-        
+
         if let Some(event_type) = &event.event_type {
             summary.push_str(&format!("   Type: {}\n", event_type));
         }
-        
+
         summary.push('\n');
     }
 
@@ -248,9 +242,9 @@ fn check_conflicts(
 ) -> AppResult<Vec<String>> {
     let new_start_dt = parse_datetime(new_start)?;
     let new_end_dt = parse_datetime(new_end)?;
-    
+
     let mut conflicts = Vec::new();
-    
+
     for event in existing_events {
         // Skip the event being updated
         if let Some(exclude_id) = exclude_event_id {
@@ -258,10 +252,10 @@ fn check_conflicts(
                 continue;
             }
         }
-        
+
         let event_start_dt = parse_datetime(&event.start_at)?;
         let event_end_dt = parse_datetime(&event.end_at)?;
-        
+
         // Check for overlap
         if new_start_dt < event_end_dt && new_end_dt > event_start_dt {
             conflicts.push(format!(
@@ -272,17 +266,17 @@ fn check_conflicts(
             ));
         }
     }
-    
+
     Ok(conflicts)
 }
-
 
 /// Get calendar events within a date range
 ///
 /// This tool allows the AI to retrieve calendar events for a specified date range.
 /// Returns a formatted list of events with their details.
+/// Note: Currently queries tasks with due dates or start dates in the range.
 pub async fn get_calendar_events_tool(
-    _planning_service: Arc<PlanningService>,
+    planning_service: Arc<PlanningService>,
     args: JsonValue,
 ) -> AppResult<JsonValue> {
     debug!(target: "calendar_tools", "Getting calendar events with args: {}", args);
@@ -299,38 +293,145 @@ pub async fn get_calendar_events_tool(
         ));
     }
 
-    // For now, we'll return a placeholder implementation
-    // In a real implementation, this would query a calendar database or service
-    // Since the codebase uses ExistingEvent in planning constraints, we'll simulate that
-    
-    // TODO: Replace with actual calendar data retrieval
-    // This is a placeholder that returns empty events
-    let events: Vec<ExistingEvent> = vec![];
-    
-    // Apply event type filter if provided
-    let filtered_events: Vec<ExistingEvent> = if let Some(event_type) = &params.event_type {
-        events
-            .into_iter()
-            .filter(|e| {
-                e.event_type
-                    .as_ref()
-                    .map(|t| t.eq_ignore_ascii_case(event_type))
-                    .unwrap_or(false)
-            })
-            .collect()
-    } else {
-        events
-    };
+    // Get all tasks from task service
+    let all_tasks = planning_service.get_task_service().list_tasks()?;
 
-    let summary = format_events_summary(&filtered_events);
+    // Filter tasks that fall within the date range
+    let mut events_in_range: Vec<serde_json::Map<String, JsonValue>> = Vec::new();
+
+    for task in all_tasks {
+        let mut task_date: Option<NaiveDate> = None;
+
+        // Check due_at first
+        if let Some(due_at) = &task.due_at {
+            if let Ok(dt) = DateTime::parse_from_rfc3339(due_at) {
+                let date = dt.date_naive();
+                if date >= start_date && date <= end_date {
+                    task_date = Some(date);
+                }
+            }
+        }
+
+        // Also check start_at if no due_at or if we want to include both
+        if task_date.is_none() {
+            if let Some(start_at) = &task.start_at {
+                if let Ok(dt) = DateTime::parse_from_rfc3339(start_at) {
+                    let date = dt.date_naive();
+                    if date >= start_date && date <= end_date {
+                        task_date = Some(date);
+                    }
+                }
+            }
+        }
+
+        if let Some(date) = task_date {
+            let mut event_obj = serde_json::Map::new();
+            event_obj.insert("id".to_string(), json!(task.id));
+            event_obj.insert("title".to_string(), json!(task.title));
+            event_obj.insert("date".to_string(), json!(date.to_string()));
+            event_obj.insert("status".to_string(), json!(task.status));
+            event_obj.insert("priority".to_string(), json!(task.priority));
+
+            if let Some(desc) = &task.description {
+                event_obj.insert("description".to_string(), json!(desc));
+            }
+
+            if let Some(due_at) = &task.due_at {
+                event_obj.insert("due_at".to_string(), json!(due_at));
+            }
+
+            if let Some(start_at) = &task.start_at {
+                event_obj.insert("start_at".to_string(), json!(start_at));
+            }
+
+            if !task.tags.is_empty() {
+                event_obj.insert("tags".to_string(), json!(task.tags));
+            }
+
+            events_in_range.push(event_obj);
+        }
+    }
+
+    // Sort by date
+    events_in_range.sort_by(|a, b| {
+        let date_a = a.get("date").and_then(|v| v.as_str()).unwrap_or("");
+        let date_b = b.get("date").and_then(|v| v.as_str()).unwrap_or("");
+        date_a.cmp(date_b)
+    });
+
+    // Build summary message
+    let summary = if events_in_range.is_empty() {
+        format!(
+            "在 {} 至 {} 期间没有找到任何任务或日程安排。",
+            params.start_date, params.end_date
+        )
+    } else {
+        let mut msg = format!(
+            "在 {} 至 {} 期间找到 {} 个任务:\n\n",
+            params.start_date,
+            params.end_date,
+            events_in_range.len()
+        );
+
+        for (idx, event) in events_in_range.iter().enumerate() {
+            let title = event
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("无标题");
+            let date = event.get("date").and_then(|v| v.as_str()).unwrap_or("");
+            let priority = event
+                .get("priority")
+                .and_then(|v| v.as_str())
+                .unwrap_or("medium");
+            let status = event
+                .get("status")
+                .and_then(|v| v.as_str())
+                .unwrap_or("pending");
+
+            let status_emoji = match status {
+                "completed" => "✅",
+                "in_progress" => "🔄",
+                _ => "📋",
+            };
+
+            let priority_emoji = match priority {
+                "high" => "🔴",
+                "medium" => "🟡",
+                "low" => "🟢",
+                _ => "⚪",
+            };
+
+            msg.push_str(&format!(
+                "{}. {} {} [{}] {}\n",
+                idx + 1,
+                status_emoji,
+                priority_emoji,
+                date,
+                title
+            ));
+
+            if let Some(desc) = event.get("description").and_then(|v| v.as_str()) {
+                if !desc.is_empty() {
+                    let short_desc = if desc.len() > 50 {
+                        format!("{}...", &desc[..50])
+                    } else {
+                        desc.to_string()
+                    };
+                    msg.push_str(&format!("   {}\n", short_desc));
+                }
+            }
+        }
+
+        msg
+    };
 
     Ok(json!({
         "success": true,
         "message": summary,
         "start_date": params.start_date,
         "end_date": params.end_date,
-        "count": filtered_events.len(),
-        "events": filtered_events.iter().map(format_event_for_ai).collect::<Vec<_>>()
+        "count": events_in_range.len(),
+        "events": events_in_range
     }))
 }
 
@@ -349,7 +450,7 @@ pub async fn create_calendar_event_tool(
     // Parse and validate date and time
     let date = parse_date(&params.date)?;
     let start_time = parse_time(&params.start_time)?;
-    
+
     // Validate duration
     if params.duration_minutes <= 0 {
         return Err(AppError::validation(
@@ -359,7 +460,7 @@ pub async fn create_calendar_event_tool(
 
     // Combine date and time into RFC3339 format
     let start_at = combine_datetime(date, start_time)?;
-    
+
     // Calculate end time
     let start_dt = parse_datetime(&start_at)?;
     let end_dt = start_dt + Duration::minutes(params.duration_minutes);
@@ -377,7 +478,7 @@ pub async fn create_calendar_event_tool(
     // TODO: Replace with actual calendar data storage
     // For now, we'll just check for conflicts with an empty list
     let existing_events: Vec<ExistingEvent> = vec![];
-    
+
     // Check for conflicts
     let conflicts = check_conflicts(&start_at, &end_at, &existing_events, None)?;
 
@@ -422,7 +523,7 @@ pub async fn update_calendar_event_tool(
     // TODO: Replace with actual calendar data retrieval
     // For now, we'll simulate finding an event
     let existing_events: Vec<ExistingEvent> = vec![];
-    
+
     let existing_event = existing_events
         .iter()
         .find(|e| e.id == params.event_id)
@@ -444,7 +545,7 @@ pub async fn update_calendar_event_tool(
         let date = parse_date(date_str)?;
         let time = parse_time(time_str)?;
         updated_start_at = combine_datetime(date, time)?;
-        
+
         // Recalculate end time if duration is provided
         if let Some(duration) = params.duration_minutes {
             if duration <= 0 {
@@ -462,7 +563,7 @@ pub async fn update_calendar_event_tool(
         let new_date = parse_date(date_str)?;
         let time = old_start_dt.time();
         updated_start_at = combine_datetime(new_date, time)?;
-        
+
         // Adjust end time to maintain duration
         let old_end_dt = parse_datetime(&updated_end_at)?;
         let duration = old_end_dt.signed_duration_since(old_start_dt);
@@ -475,7 +576,7 @@ pub async fn update_calendar_event_tool(
         let date = old_start_dt.date_naive();
         let new_time = parse_time(time_str)?;
         updated_start_at = combine_datetime(date, new_time)?;
-        
+
         // Recalculate end time if duration is provided, otherwise maintain duration
         if let Some(duration) = params.duration_minutes {
             if duration <= 0 {
@@ -532,7 +633,11 @@ pub async fn update_calendar_event_tool(
     );
 
     if let Some(title) = params.title {
-        message = format!("✓ Calendar event updated successfully!\n\nTitle: {}\n{}", title, &message[message.find("Time:").unwrap()..]);
+        message = format!(
+            "✓ Calendar event updated successfully!\n\nTitle: {}\n{}",
+            title,
+            &message[message.find("Time:").unwrap()..]
+        );
     }
 
     if !conflicts.is_empty() {
@@ -568,7 +673,7 @@ pub fn register_calendar_tools(
     // Create a planning service for calendar operations
     // Note: We need task_service and ai_service for PlanningService, but calendar tools don't use them
     // For now, we'll pass dummy services since calendar tools don't actually use the planning_service parameter
-    
+
     // Register get_calendar_events tool
     {
         let pool = db_pool.clone();
@@ -577,24 +682,24 @@ pub fn register_calendar_tools(
             Box::pin(async move {
                 // Create a minimal planning service just for the signature
                 // The calendar tools don't actually use it
-                let task_service = Arc::new(crate::services::task_service::TaskService::new(pool.clone()));
-                let ai_service = Arc::new(crate::services::ai_service::AiService::new(pool.clone())?);
-                let planning_service = Arc::new(PlanningService::new(
+                let task_service = Arc::new(crate::services::task_service::TaskService::new(
                     pool.clone(),
-                    task_service,
-                    ai_service,
                 ));
+                let ai_service =
+                    Arc::new(crate::services::ai_service::AiService::new(pool.clone())?);
+                let planning_service =
+                    Arc::new(PlanningService::new(pool.clone(), task_service, ai_service));
                 get_calendar_events_tool(planning_service, args).await
             }) as Pin<Box<dyn Future<Output = AppResult<JsonValue>> + Send>>
         });
 
         registry.register_tool(
             "get_calendar_events".to_string(),
-            "Retrieve calendar events for a specified date range".to_string(),
+            "Retrieve calendar events/schedule/agenda for a date range. Use this when user asks to 'view calendar', 'check schedule', 'show events', 'what's coming up', or any calendar-related queries. ALWAYS provide start_date and end_date in YYYY-MM-DD format. For 'next 7 days', calculate from today. For 'last week', calculate 7 days before today.".to_string(),
             json!({
                 "type": "object",
                 "properties": get_calendar_events_schema()["properties"],
-                "required": []
+                "required": ["start_date", "end_date"]
             }),
             handler,
         )?;
@@ -606,13 +711,13 @@ pub fn register_calendar_tools(
         let handler: ToolHandler = Arc::new(move |args: JsonValue| {
             let pool = pool.clone();
             Box::pin(async move {
-                let task_service = Arc::new(crate::services::task_service::TaskService::new(pool.clone()));
-                let ai_service = Arc::new(crate::services::ai_service::AiService::new(pool.clone())?);
-                let planning_service = Arc::new(PlanningService::new(
+                let task_service = Arc::new(crate::services::task_service::TaskService::new(
                     pool.clone(),
-                    task_service,
-                    ai_service,
                 ));
+                let ai_service =
+                    Arc::new(crate::services::ai_service::AiService::new(pool.clone())?);
+                let planning_service =
+                    Arc::new(PlanningService::new(pool.clone(), task_service, ai_service));
                 create_calendar_event_tool(planning_service, args).await
             }) as Pin<Box<dyn Future<Output = AppResult<JsonValue>> + Send>>
         });
@@ -635,13 +740,13 @@ pub fn register_calendar_tools(
         let handler: ToolHandler = Arc::new(move |args: JsonValue| {
             let pool = pool.clone();
             Box::pin(async move {
-                let task_service = Arc::new(crate::services::task_service::TaskService::new(pool.clone()));
-                let ai_service = Arc::new(crate::services::ai_service::AiService::new(pool.clone())?);
-                let planning_service = Arc::new(PlanningService::new(
+                let task_service = Arc::new(crate::services::task_service::TaskService::new(
                     pool.clone(),
-                    task_service,
-                    ai_service,
                 ));
+                let ai_service =
+                    Arc::new(crate::services::ai_service::AiService::new(pool.clone())?);
+                let planning_service =
+                    Arc::new(PlanningService::new(pool.clone(), task_service, ai_service));
                 update_calendar_event_tool(planning_service, args).await
             }) as Pin<Box<dyn Future<Output = AppResult<JsonValue>> + Send>>
         });

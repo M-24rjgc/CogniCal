@@ -3,8 +3,11 @@ pub mod ai_commands;
 pub mod analytics;
 pub mod cache;
 pub mod community;
+pub mod dependency_commands;
 pub mod feedback;
+pub mod goal_commands;
 pub mod planning;
+pub mod recurring_commands;
 pub mod settings;
 pub mod task;
 pub mod wellness;
@@ -21,8 +24,10 @@ use crate::services::ai_agent_service::AiAgentService;
 use crate::services::ai_service::AiService;
 use crate::services::analytics_service::AnalyticsService;
 use crate::services::community_service::CommunityService;
+use crate::services::dependency_service::DependencyService;
 use crate::services::feedback_service::FeedbackService;
-
+use crate::services::goal_service::GoalService;
+use crate::services::memory_service::MemoryService;
 use crate::services::planning_service::PlanningService;
 use crate::services::productivity_score_service::ProductivityScoreService;
 use crate::services::settings_service::SettingsService;
@@ -44,13 +49,17 @@ pub struct AppState {
     workload_forecast_service: Arc<WorkloadForecastService>,
     feedback_service: Arc<FeedbackService>,
     pub community_service: CommunityService,
+    dependency_service: Arc<DependencyService>,
+    memory_service: Arc<MemoryService>,
+    goal_service: Arc<GoalService>,
+    recurring_task_service: Arc<crate::services::recurring_task_service::RecurringTaskService>,
 
     tool_registry: Arc<ToolRegistry>,
     agent_service: Arc<AiAgentService>,
 }
 
 impl AppState {
-    pub fn new(db_pool: DbPool) -> AppResult<Self> {
+    pub fn new(db_pool: DbPool, memory_base_dir: std::path::PathBuf) -> AppResult<Self> {
         let task_service = Arc::new(TaskService::new(db_pool.clone()));
         let ai_service = Arc::new(AiService::new(db_pool.clone())?);
         let planning_service = Arc::new(PlanningService::new(
@@ -79,29 +88,55 @@ impl AppState {
         ));
         let community_service = CommunityService::new(db_pool.clone());
 
+        // Initialize memory service with provided base directory
+        let memory_dir = memory_base_dir.join("memory");
+        let memory_service = Arc::new(MemoryService::new(memory_dir)?);
 
+        // Initialize goal service
+        let goal_service = Arc::new(GoalService::new(db_pool.clone()));
+
+        // Initialize dependency service
+        let dependency_service = Arc::new(DependencyService::new(db_pool.clone()));
+
+        // Initialize recurring task service
+        let recurring_task_service = Arc::new(
+            crate::services::recurring_task_service::RecurringTaskService::new(db_pool.clone()),
+        );
 
         // Initialize tool registry and register tools
         let mut tool_registry = ToolRegistry::new();
-        
-        // Register task management tools
-        crate::tools::task_tools::register_task_tools(
+
+        // Register unified time management tools (replaces task_tools and calendar_tools)
+        crate::tools::time_management_tools::register_time_management_tools(
             &mut tool_registry,
             Arc::clone(&task_service),
         )?;
-        
-        // Register calendar tools
-        crate::tools::calendar_tools::register_calendar_tools(
+
+        // Register dependency management tools
+        crate::tools::dependency_tools::register_dependency_tools(
             &mut tool_registry,
-            db_pool.clone(),
+            Arc::clone(&dependency_service),
         )?;
-        
+
+        // Register goal management tools
+        crate::tools::goal_tools::register_goal_tools(
+            &mut tool_registry,
+            Arc::clone(&goal_service),
+        )?;
+
+        // Register recurring task management tools
+        crate::tools::recurring_task_tools::register_recurring_task_tools(
+            &mut tool_registry,
+            Arc::clone(&recurring_task_service),
+        )?;
+
         let tool_registry = Arc::new(tool_registry);
 
-        // Initialize AI agent service
-        let agent_service = Arc::new(AiAgentService::new(
+        // Initialize AI agent service with memory
+        let agent_service = Arc::new(AiAgentService::new_with_memory(
             Arc::clone(&ai_service),
             Arc::clone(&tool_registry),
+            Arc::clone(&memory_service),
         ));
 
         analytics_service.ensure_snapshot_job()?;
@@ -120,6 +155,10 @@ impl AppState {
             workload_forecast_service,
             feedback_service,
             community_service,
+            dependency_service,
+            memory_service,
+            goal_service,
+            recurring_task_service,
 
             tool_registry,
             agent_service,
@@ -174,14 +213,24 @@ impl AppState {
         Arc::clone(&self.ai_service)
     }
 
-
-
     pub fn tools(&self) -> Arc<ToolRegistry> {
         Arc::clone(&self.tool_registry)
     }
 
     pub fn agent(&self) -> Arc<AiAgentService> {
         Arc::clone(&self.agent_service)
+    }
+
+    pub fn memory(&self) -> Arc<MemoryService> {
+        Arc::clone(&self.memory_service)
+    }
+
+    pub fn goals(&self) -> Arc<GoalService> {
+        Arc::clone(&self.goal_service)
+    }
+
+    pub fn dependency_service(&self) -> Arc<DependencyService> {
+        Arc::clone(&self.dependency_service)
     }
 
     /// Clear all cached data except settings

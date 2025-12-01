@@ -13,6 +13,7 @@ import { HelpPopover } from '../components/help/HelpPopover';
 import { CalendarView } from '../components/calendar/CalendarView';
 import { DayDetailPanel } from '../components/calendar/DayDetailPanel';
 import { TaskDetailsDrawer } from '../components/tasks/TaskDetailsDrawer';
+import { extractDateKey, formatDateKey } from '../utils/date';
 
 const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
   hour: '2-digit',
@@ -48,28 +49,20 @@ export default function CalendarPage() {
 
   const selectedDateTasks = useMemo(() => {
     if (!selectedDate) return [];
-    const dateStr = selectedDate.toISOString().split('T')[0];
+    const selectedKey = formatDateKey(selectedDate);
     return tasks.filter((task) => {
-      if (task.dueAt) {
-        const dueDate = new Date(task.dueAt).toISOString().split('T')[0];
-        if (dueDate === dateStr) return true;
-      }
-      if (task.startAt) {
-        const startDate = new Date(task.startAt).toISOString().split('T')[0];
-        if (startDate === dateStr) return true;
-      }
-      return false;
+      const dueKey = task.dueAt ? extractDateKey(task.dueAt) : null;
+      const startKey = task.startAt ? extractDateKey(task.startAt) : null;
+      return dueKey === selectedKey || startKey === selectedKey;
     });
   }, [selectedDate, tasks]);
 
   const selectedDateBlocks = useMemo(() => {
     if (!selectedDate) return [];
-    const dateStr = selectedDate.toISOString().split('T')[0];
-    return planningBlocks.filter((block) => {
-      const blockDate = new Date(block.startAt).toISOString().split('T')[0];
-      return blockDate === dateStr;
-    });
-  }, [selectedDate, planningBlocks]);
+    const selectedKey = formatDateKey(selectedDate);
+    const blocks = selectedOption?.blocks ?? [];
+    return blocks.filter((block) => extractDateKey(block.startAt) === selectedKey);
+  }, [selectedDate, selectedOption]);
 
   const conflicts = selectedOption?.conflicts ?? session?.conflicts ?? [];
   const conflictCount = conflicts.length;
@@ -89,7 +82,12 @@ export default function CalendarPage() {
       : '配置 DeepSeek API Key 才能启用智能分析与冲突洞察。';
 
   const handleDateClick = (date: Date) => {
-    setSelectedDate(date);
+    setSelectedDate((prev) => {
+      if (!prev) {
+        return date;
+      }
+      return formatDateKey(prev) === formatDateKey(date) ? null : date;
+    });
   };
 
   const handleTaskClick = (task: Task) => {
@@ -211,6 +209,7 @@ export default function CalendarPage() {
           onDateClick={handleDateClick}
           onTaskClick={handleTaskClick}
           onBlockClick={handleBlockClick}
+          selectedDate={selectedDate}
         />
 
         {/* 侧边栏 */}

@@ -223,9 +223,8 @@ struct SearchTasksParams {
 
 /// Helper function to extract parameters from JSON
 fn extract_params<T: for<'de> Deserialize<'de>>(args: &JsonValue) -> AppResult<T> {
-    serde_json::from_value(args.clone()).map_err(|e| {
-        AppError::validation(format!("Failed to parse tool parameters: {}", e))
-    })
+    serde_json::from_value(args.clone())
+        .map_err(|e| AppError::validation(format!("Failed to parse tool parameters: {}", e)))
 }
 
 /// Helper function to format a task record for AI consumption
@@ -251,7 +250,7 @@ fn format_tasks_summary(tasks: &[crate::models::task::TaskRecord]) -> String {
     }
 
     let mut summary = format!("Found {} task(s):\n\n", tasks.len());
-    
+
     for (idx, task) in tasks.iter().enumerate() {
         summary.push_str(&format!(
             "{}. [{}] {} ({})\n",
@@ -260,33 +259,40 @@ fn format_tasks_summary(tasks: &[crate::models::task::TaskRecord]) -> String {
             task.title,
             task.priority
         ));
-        
+
         if let Some(desc) = &task.description {
             let short_desc = if desc.len() > 100 {
-                format!("{}...", &desc[..100])
+                // Safely truncate at character boundary
+                let mut end = 100;
+                while end > 0 && !desc.is_char_boundary(end) {
+                    end -= 1;
+                }
+                format!("{}...", &desc[..end])
             } else {
                 desc.clone()
             };
             summary.push_str(&format!("   Description: {}\n", short_desc));
         }
-        
+
         if let Some(due) = &task.due_at {
             summary.push_str(&format!("   Due: {}\n", due));
         }
-        
+
         if !task.tags.is_empty() {
             summary.push_str(&format!("   Tags: {}\n", task.tags.join(", ")));
         }
-        
+
         summary.push_str(&format!("   ID: {}\n\n", task.id));
     }
 
     // Add statistics
-    let status_counts = tasks.iter().fold(std::collections::HashMap::new(), |mut acc, task| {
-        *acc.entry(&task.status).or_insert(0) += 1;
-        acc
-    });
-    
+    let status_counts = tasks
+        .iter()
+        .fold(std::collections::HashMap::new(), |mut acc, task| {
+            *acc.entry(&task.status).or_insert(0) += 1;
+            acc
+        });
+
     summary.push_str("Summary by status:\n");
     for (status, count) in status_counts {
         summary.push_str(&format!("  - {}: {}\n", status, count));
@@ -378,7 +384,7 @@ pub async fn update_task_tool(
         }
         Err(e) => {
             error!(target: "task_tools", error = %e, task_id = %params.task_id, "Failed to update task");
-            
+
             // Check if it's a not found error
             if matches!(e, AppError::NotFound) {
                 Err(AppError::validation(format!(
@@ -480,10 +486,7 @@ pub async fn list_tasks_tool(
         }
         Err(e) => {
             error!(target: "task_tools", error = %e, "Failed to list tasks");
-            Err(AppError::validation(format!(
-                "Failed to list tasks: {}",
-                e
-            )))
+            Err(AppError::validation(format!("Failed to list tasks: {}", e)))
         }
     }
 }
@@ -639,7 +642,7 @@ pub fn register_task_tools(
 
         registry.register_tool(
             "list_tasks".to_string(),
-            "List tasks with optional filters (status, priority, tags, date range)".to_string(),
+            "List/view/show all tasks with optional filters. Use this when user asks to 'show tasks', 'list tasks', 'what tasks do I have', 'view my tasks', or similar. Can filter by: status (pending/completed), priority (low/medium/high), tags, or date_range. If no filters specified, returns all tasks. For date ranges, calculate from current date automatically.".to_string(),
             json!({
                 "type": "object",
                 "properties": list_tasks_schema()["properties"],
@@ -660,7 +663,7 @@ pub fn register_task_tools(
 
         registry.register_tool(
             "search_tasks".to_string(),
-            "Search tasks by matching against titles and descriptions".to_string(),
+            "Search/find tasks by keyword matching against titles and descriptions. Use when user asks to 'find task about X', 'search for tasks containing Y', or needs to locate specific tasks by content. Provide the search query as the 'query' parameter.".to_string(),
             json!({
                 "type": "object",
                 "properties": search_tasks_schema()["properties"],

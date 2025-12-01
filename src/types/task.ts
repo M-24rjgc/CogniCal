@@ -52,6 +52,63 @@ export interface TaskRecurrence {
   until?: string;
 }
 
+// Enhanced recurring task types for v2.0 features
+export const RECURRENCE_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'] as const;
+export type RecurrenceFrequency = (typeof RECURRENCE_FREQUENCIES)[number];
+
+export const RECURRENCE_END_TYPES = ['never', 'date', 'count'] as const;
+export type RecurrenceEndType = (typeof RECURRENCE_END_TYPES)[number];
+
+export const WEEKDAYS = [
+  { value: 0, label: 'Sunday', short: 'SU' },
+  { value: 1, label: 'Monday', short: 'MO' },
+  { value: 2, label: 'Tuesday', short: 'TU' },
+  { value: 3, label: 'Wednesday', short: 'WE' },
+  { value: 4, label: 'Thursday', short: 'TH' },
+  { value: 5, label: 'Friday', short: 'FR' },
+  { value: 6, label: 'Saturday', short: 'SA' },
+] as const;
+
+export interface RecurrenceRuleConfig {
+  frequency: RecurrenceFrequency;
+  interval: number;
+  endType: RecurrenceEndType;
+  endDate?: string;
+  endCount?: number;
+  weekdays?: number[]; // 0-6, Sunday-Saturday
+  monthDay?: number; // 1-31
+  monthWeek?: number; // 1-4, first-fourth
+  monthWeekday?: number; // 0-6, for "first Monday" type patterns
+}
+
+export interface TaskInstance {
+  id: string;
+  templateId: string;
+  instanceDate: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  dueAt?: string;
+  completedAt?: string;
+  isException: boolean; // Modified from template
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecurringTaskTemplate {
+  id: string;
+  title: string;
+  description?: string;
+  recurrenceRule: RecurrenceRuleConfig;
+  priority: TaskPriority;
+  tags: string[];
+  estimatedMinutes?: number;
+  createdAt: string;
+  updatedAt: string;
+  isActive: boolean;
+}
+
 export interface TaskAIInsights {
   /** AI 总结 */
   summary?: string;

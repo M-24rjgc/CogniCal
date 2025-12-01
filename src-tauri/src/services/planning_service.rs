@@ -22,8 +22,8 @@ use crate::models::task::TaskRecord;
 use crate::services::ai_service::AiService;
 use crate::services::behavior_learning::{BehaviorLearningService, PreferenceSnapshot};
 use crate::services::schedule_optimizer::{
-    detect_conflicts, PlanOption, PlanRationaleStep, ScheduleConflict, ScheduleConstraints,
-    ScheduleOptimizer, SchedulableTask, SchedulingPreferences, TimeBlockCandidate,
+    detect_conflicts, PlanOption, PlanRationaleStep, SchedulableTask, ScheduleConflict,
+    ScheduleConstraints, ScheduleOptimizer, SchedulingPreferences, TimeBlockCandidate,
 };
 use crate::services::schedule_utils;
 use crate::services::task_service::TaskService;
@@ -125,6 +125,11 @@ impl PlanningService {
             task_service,
             ai_service,
         }
+    }
+
+    /// Get a reference to the task service
+    pub fn get_task_service(&self) -> &Arc<TaskService> {
+        &self.task_service
     }
 
     pub async fn generate_plan(&self, input: GeneratePlanInput) -> AppResult<PlanningSessionView> {
@@ -518,11 +523,7 @@ impl PlanningService {
             .map(Self::map_schedulable_task)
             .collect::<Vec<_>>();
 
-        optimizer.generate_plan_options(
-            schedulable_tasks,
-            constraints.clone(),
-            preferences.clone(),
-        )
+        optimizer.generate_plan_options(schedulable_tasks, constraints.clone(), preferences.clone())
     }
 
     /// Convert AI SchedulePlanDto to our PlanOption format
@@ -677,11 +678,9 @@ impl PlanningService {
                     .map(|hours| (hours * 60.0).round() as i64)
             }),
             priority_weight: priority_weight(&task.priority),
-            is_parallelizable: task
-                .tags
-                .iter()
-                .any(|tag| tag.eq_ignore_ascii_case("parallel")
-                    || tag.eq_ignore_ascii_case("parallelizable")),
+            is_parallelizable: task.tags.iter().any(|tag| {
+                tag.eq_ignore_ascii_case("parallel") || tag.eq_ignore_ascii_case("parallelizable")
+            }),
         }
     }
 }

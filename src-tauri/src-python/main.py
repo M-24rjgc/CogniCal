@@ -3,11 +3,9 @@ CogniCal Memory Service - Python Implementation
 Provides semantic memory storage and retrieval functionality
 """
 
-import json
-import os
 import sys
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 
 # Register functions that can be called from Rust/JavaScript
 _tauri_plugin_functions = [

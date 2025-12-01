@@ -252,3 +252,128 @@ CREATE TABLE IF NOT EXISTS memory_config (
     value TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS migration_history (
+    version INTEGER PRIMARY KEY,
+    description TEXT NOT NULL,
+    applied_at TEXT NOT NULL,
+    rollback_sql TEXT
+);
+
+-- Recurring task templates table with RRULE support
+CREATE TABLE IF NOT EXISTS recurring_task_templates (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    recurrence_rule TEXT NOT NULL, -- RRULE string following RFC 5545
+    priority TEXT DEFAULT 'medium',
+    tags TEXT, -- JSON array
+    estimated_minutes INTEGER,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Task instances generated from templates
+CREATE TABLE IF NOT EXISTS task_instances (
+    id TEXT PRIMARY KEY,
+    template_id TEXT NOT NULL,
+    instance_date TEXT NOT NULL, -- ISO date for this occurrence
+    title TEXT NOT NULL,
+    description TEXT,
+    status TEXT DEFAULT 'todo',
+    priority TEXT DEFAULT 'medium',
+    due_at TEXT,
+    completed_at TEXT,
+    is_exception BOOLEAN DEFAULT FALSE, -- Modified from template
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (template_id) REFERENCES recurring_task_templates(id) ON DELETE CASCADE
+);
+
+-- Indexes for efficient instance and template queries
+CREATE INDEX IF NOT EXISTS idx_recurring_task_templates_is_active 
+    ON recurring_task_templates(is_active);
+CREATE INDEX IF NOT EXISTS idx_recurring_task_templates_created_at 
+    ON recurring_task_templates(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_task_instances_template_date 
+    ON task_instances(template_id, instance_date);
+CREATE INDEX IF NOT EXISTS idx_task_instances_due_at 
+    ON task_instances(due_at) WHERE due_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_task_instances_status 
+    ON task_instances(status);
+CREATE INDEX IF NOT EXISTS idx_task_instances_template_id 
+    ON task_instances(template_id);
+
+-- Task dependency relationships
+CREATE TABLE IF NOT EXISTS task_dependencies (
+    id TEXT PRIMARY KEY,
+    predecessor_id TEXT NOT NULL,
+    successor_id TEXT NOT NULL,
+    dependency_type TEXT DEFAULT 'finish_to_start',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (predecessor_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    FOREIGN KEY (successor_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    UNIQUE(predecessor_id, successor_id)
+);
+
+-- Indexes for dependency queries
+CREATE INDEX IF NOT EXISTS idx_task_dependencies_predecessor 
+    ON task_dependencies(predecessor_id);
+CREATE INDEX IF NOT EXISTS idx_task_dependencies_successor 
+    ON task_dependencies(successor_id);
+CREATE INDEX IF NOT EXISTS idx_task_dependencies_created_at 
+    ON task_dependencies(created_at);
+
+-- View for ready tasks (no incomplete dependencies)
+CREATE VIEW IF NOT EXISTS ready_tasks AS
+SELECT t.id, t.title, t.status, t.priority, t.due_at
+FROM tasks t
+WHERE t.status != 'completed'
+AND NOT EXISTS (
+    SELECT 1 FROM task_dependencies td
+    JOIN tasks pt ON td.predecessor_id = pt.id
+    WHERE td.successor_id = t.id
+    AND pt.status != 'completed'
+);
+
+-- Goals table for goal-oriented task breakdown
+CREATE TABLE IF NOT EXISTS goals (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    parent_goal_id TEXT,
+    status TEXT DEFAULT 'not_started',
+    priority TEXT DEFAULT 'medium',
+    target_date TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (parent_goal_id) REFERENCES goals(id) ON DELETE CASCADE
+);
+
+-- Goal-task associations
+CREATE TABLE IF NOT EXISTS goal_task_associations (
+    id TEXT PRIMARY KEY,
+    goal_id TEXT NOT NULL,
+    task_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (goal_id) REFERENCES goals(id) ON DELETE CASCADE,
+    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+    UNIQUE(goal_id, task_id)
+);
+
+-- Indexes for goal queries
+CREATE INDEX IF NOT EXISTS idx_goals_parent_goal_id 
+    ON goals(parent_goal_id);
+CREATE INDEX IF NOT EXISTS idx_goals_status 
+    ON goals(status);
+CREATE INDEX IF NOT EXISTS idx_goals_target_date 
+    ON goals(target_date);
+CREATE INDEX IF NOT EXISTS idx_goals_created_at 
+    ON goals(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_goal_task_associations_goal_id 
+    ON goal_task_associations(goal_id);
+CREATE INDEX IF NOT EXISTS idx_goal_task_associations_task_id 
+    ON goal_task_associations(task_id);

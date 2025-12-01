@@ -35,7 +35,13 @@ fn try_run() -> Result<(), Box<dyn std::error::Error>> {
             let pool = crate::db::DbPool::new(&data_dir)
                 .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)?;
 
-            let state = crate::commands::AppState::new(pool)
+            // Get app data directory for memory storage
+            let app_data_dir = handle
+                .path()
+                .app_data_dir()
+                .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)?;
+
+            let state = crate::commands::AppState::new(pool, app_data_dir)
                 .map_err(|err| Box::new(err) as Box<dyn std::error::Error>)?;
             app.manage(state);
 
@@ -56,8 +62,9 @@ fn try_run() -> Result<(), Box<dyn std::error::Error>> {
             crate::commands::ai_commands::ai_status,
             crate::commands::ai_commands::ai_chat,
             crate::commands::ai_commands::ai_agent_chat,
-
-
+            crate::commands::ai_commands::memory_search,
+            crate::commands::ai_commands::memory_export,
+            crate::commands::ai_commands::memory_clear,
             crate::commands::planning::planning_apply,
             crate::commands::planning::planning_generate,
             crate::commands::planning::planning_preferences_get,
@@ -92,6 +99,31 @@ fn try_run() -> Result<(), Box<dyn std::error::Error>> {
             crate::commands::community::community_generate_export_bundle,
             crate::commands::community::community_save_export_to_file,
             crate::commands::community::community_list_exports,
+            crate::commands::goal_commands::create_goal,
+            crate::commands::goal_commands::get_goal,
+            crate::commands::goal_commands::list_goals,
+            crate::commands::goal_commands::update_goal,
+            crate::commands::goal_commands::delete_goal,
+            crate::commands::goal_commands::associate_task_with_goal,
+            crate::commands::goal_commands::dissociate_task_from_goal,
+            crate::commands::goal_commands::get_goal_tasks,
+            crate::commands::goal_commands::get_goal_with_progress,
+            crate::commands::dependency_commands::get_task_dependencies,
+            crate::commands::dependency_commands::get_dependency_graph,
+            crate::commands::dependency_commands::get_ready_tasks,
+            crate::commands::dependency_commands::add_dependency,
+            crate::commands::dependency_commands::remove_dependency,
+            crate::commands::dependency_commands::update_dependency_type,
+            crate::commands::dependency_commands::validate_dependency,
+            // Recurring task commands
+            crate::commands::recurring_commands::recurring_template_list,
+            crate::commands::recurring_commands::recurring_template_create,
+            crate::commands::recurring_commands::recurring_template_update,
+            crate::commands::recurring_commands::recurring_template_delete,
+            crate::commands::recurring_commands::recurring_template_get,
+            crate::commands::recurring_commands::recurring_template_generate_instances,
+            crate::commands::recurring_commands::recurring_template_instances,
+            crate::commands::recurring_commands::recurring_task_to_regular,
         ])
         .run(tauri::generate_context!())?;
 

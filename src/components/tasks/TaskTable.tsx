@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { RecurringTaskIndicator } from './RecurringTaskIndicator';
 
 interface TaskTableProps {
   tasks: Task[];
@@ -21,6 +22,8 @@ interface TaskTableProps {
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (task: Task) => void;
   onPlanTask?: (task: Task) => void;
+  onManageRecurringInstances?: (task: Task) => void;
+  onEditRecurringTemplate?: (task: Task) => void;
 }
 
 const STATUS_LABELS: Record<Task['status'], string> = {
@@ -56,6 +59,8 @@ export function TaskTable({
   onEditTask,
   onDeleteTask,
   onPlanTask,
+  onManageRecurringInstances,
+  onEditRecurringTemplate,
 }: TaskTableProps) {
   const hasData = tasks.length > 0;
 
@@ -100,6 +105,8 @@ export function TaskTable({
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
                 onPlanTask={onPlanTask}
+                onManageRecurringInstances={onManageRecurringInstances}
+                onEditRecurringTemplate={onEditRecurringTemplate}
               />
             ))
           ) : (
@@ -118,7 +125,7 @@ export function TaskTable({
 interface TaskRowProps
   extends Pick<
     TaskTableProps,
-    'onSelect' | 'onViewDetails' | 'onEditTask' | 'onDeleteTask' | 'onPlanTask'
+    'onSelect' | 'onViewDetails' | 'onEditTask' | 'onDeleteTask' | 'onPlanTask' | 'onManageRecurringInstances' | 'onEditRecurringTemplate'
   > {
   task: Task;
   isSelected: boolean;
@@ -134,6 +141,8 @@ function TaskRow({
   onEditTask,
   onDeleteTask,
   onPlanTask,
+  onManageRecurringInstances,
+  onEditRecurringTemplate,
 }: TaskRowProps) {
   const handleSelect = () => {
     onSelect?.(task);
@@ -155,6 +164,14 @@ function TaskRow({
     onPlanTask?.(task);
   };
 
+  const handleManageInstances = () => {
+    onManageRecurringInstances?.(task);
+  };
+
+  const handleEditTemplate = () => {
+    onEditRecurringTemplate?.(task);
+  };
+
   const dueAtDisplay = task.dueAt ? DATE_FORMATTER.format(new Date(task.dueAt)) : '未设置';
   const startAtDisplay = task.startAt ? DATE_FORMATTER.format(new Date(task.startAt)) : null;
 
@@ -167,7 +184,17 @@ function TaskRow({
     >
       <TableCell>
         <div className="flex flex-col gap-1">
-          <span className="text-sm font-medium text-foreground">{task.title}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{task.title}</span>
+            {task.isRecurring && (
+              <RecurringTaskIndicator
+                task={task}
+                onManageInstances={handleManageInstances}
+                onEditTemplate={handleEditTemplate}
+                compact
+              />
+            )}
+          </div>
           {task.description ? (
             <p className="line-clamp-1 text-xs text-muted-foreground">{task.description}</p>
           ) : null}

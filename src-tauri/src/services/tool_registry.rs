@@ -11,9 +11,7 @@ use tracing::{debug, error, info, warn};
 /// Type alias for tool handler functions
 /// Handlers are async functions that take JSON parameters and return JSON results
 pub type ToolHandler = Arc<
-    dyn Fn(JsonValue) -> Pin<Box<dyn Future<Output = AppResult<JsonValue>> + Send>>
-        + Send
-        + Sync,
+    dyn Fn(JsonValue) -> Pin<Box<dyn Future<Output = AppResult<JsonValue>> + Send>> + Send + Sync,
 >;
 
 /// Definition of a tool that can be called by the AI
@@ -51,11 +49,29 @@ pub struct ToolRegistry {
 }
 
 impl ToolRegistry {
-    /// Create a new tool registry with default timeout (5 seconds)
+    /// Create a new tool registry with default timeout (15 seconds)
+    /// This is more reasonable for complex AI tool calls that may involve
+    /// database operations, API calls, or file I/O
     pub fn new() -> Self {
         Self {
             tools: HashMap::new(),
-            timeout_duration: Duration::from_secs(5),
+            timeout_duration: Duration::from_secs(15),
+        }
+    }
+
+    /// Create a new tool registry with aggressive timeout for quick operations
+    pub fn with_fast_timeout() -> Self {
+        Self {
+            tools: HashMap::new(),
+            timeout_duration: Duration::from_secs(3), // Fast operations like validation, simple queries
+        }
+    }
+
+    /// Create a new tool registry with slow timeout for intensive operations
+    pub fn with_slow_timeout() -> Self {
+        Self {
+            tools: HashMap::new(),
+            timeout_duration: Duration::from_secs(30), // Complex operations, large data processing
         }
     }
 
@@ -255,14 +271,14 @@ impl ToolRegistry {
                 error = %e,
                 "Tool call validation failed"
             );
-            
+
             // Format user-friendly error message for AI
             let user_friendly_error = format!(
                 "无法执行工具 '{}': 参数验证失败。{}",
                 tool_name,
                 self.format_validation_error(&e)
             );
-            
+
             return ToolResult {
                 tool_call_id,
                 result: None,
@@ -319,14 +335,14 @@ impl ToolRegistry {
                     error = %e,
                     "Tool execution failed"
                 );
-                
+
                 // Format user-friendly error message for AI
                 let user_friendly_error = format!(
                     "工具 '{}' 执行失败: {}",
                     tool_name,
                     self.format_execution_error(&e)
                 );
-                
+
                 ToolResult {
                     tool_call_id,
                     result: None,
@@ -342,13 +358,13 @@ impl ToolRegistry {
                     timeout_ms = ?self.timeout_duration.as_millis(),
                     "Tool execution timed out"
                 );
-                
+
                 let timeout_error = format!(
                     "工具 '{}' 执行超时（超过 {}ms）。请稍后重试或简化请求。",
                     tool_name,
                     self.timeout_duration.as_millis()
                 );
-                
+
                 ToolResult {
                     tool_call_id,
                     result: None,
@@ -361,7 +377,9 @@ impl ToolRegistry {
     /// Format validation error for user-friendly display
     fn format_validation_error(&self, error: &AppError) -> String {
         match error {
-            AppError::Validation { message, details, .. } => {
+            AppError::Validation {
+                message, details, ..
+            } => {
                 // Extract key information from validation message
                 let base_message = if message.contains("required") {
                     "缺少必需的参数"
@@ -384,9 +402,13 @@ impl ToolRegistry {
                             .take(3) // Limit to first 3 errors
                             .map(|s| s.to_string())
                             .collect();
-                        
+
                         if !error_list.is_empty() {
-                            return format!("{}。详细信息: {}", base_message, error_list.join("; "));
+                            return format!(
+                                "{}。详细信息: {}",
+                                base_message,
+                                error_list.join("; ")
+                            );
                         }
                     }
                 }
@@ -427,7 +449,74 @@ impl ToolRegistry {
         }
     }
 
-    /// Execute multiple tool calls in parallel
+    /// Execute multiple tool calls with controlled concurrency
+    ///
+    /// # Arguments
+    /// * `tool_calls` - Vector of tool calls to execute
+    /// * `max_concurrent` - Maximum number of concurrent executions (default: 5)
+    ///
+    /// # Returns
+    /// * Vector of `ToolResult` in the same order as input
+    pub async fn execute_tools_with_concurrency(
+        &self,
+        tool_calls: Vec<ToolCall>,
+        max_concurrent: usize,
+    ) -> Vec<ToolResult> {
+        use tokio::sync::Semaphore;
+
+        // Use semaphore to limit concurrent executions
+        let semaphore = Arc::new(Semaphore::new(max_concurrent));
+        let mut results = Vec::with_capacity(tool_calls.len());
+
+        // Track original order by adding indices
+        let indexed_calls: Vec<(usize, ToolCall)> = tool_calls.into_iter().enumerate().collect();
+
+        // Create tasks for all tool calls
+        let mut tasks = Vec::new();
+        for (index, tool_call) in indexed_calls {
+            let semaphore = semaphore.clone();
+            let registry = self.clone_for_execution();
+
+            let task = tokio::spawn(async move {
+                let _permit = semaphore.acquire().await.unwrap();
+                let result = registry.execute_tool(tool_call).await;
+                (index, result)
+            });
+
+            tasks.push(task);
+        }
+
+        // Wait for all tasks and collect results
+        let mut indexed_results = Vec::new();
+        for task in tasks {
+            match task.await {
+                Ok((index, result)) => {
+                    indexed_results.push((index, result));
+                }
+                Err(e) => {
+                    error!(target: "tool_registry", error = %e, "Failed to join tool execution task");
+                    indexed_results.push((
+                        0,
+                        ToolResult {
+                            tool_call_id: "unknown".to_string(),
+                            result: None,
+                            error: Some(format!("Task join error: {}", e)),
+                        },
+                    ));
+                }
+            }
+        }
+
+        // Sort by original index and extract results
+        indexed_results.sort_by_key(|(index, _)| *index);
+        for (_, result) in indexed_results {
+            results.push(result);
+        }
+
+        results
+    }
+
+    /// Execute multiple tool calls in parallel with default concurrency limit
     ///
     /// # Arguments
     /// * `tool_calls` - Vector of tool calls to execute
@@ -435,31 +524,27 @@ impl ToolRegistry {
     /// # Returns
     /// * Vector of `ToolResult` in the same order as input
     pub async fn execute_tools(&self, tool_calls: Vec<ToolCall>) -> Vec<ToolResult> {
-        let mut handles = Vec::new();
+        self.execute_tools_with_concurrency(tool_calls, 5).await
+    }
 
-        for tool_call in tool_calls {
-            let registry = self.clone_for_execution();
-            let handle = tokio::spawn(async move { registry.execute_tool(tool_call).await });
-            handles.push(handle);
-        }
-
-        let mut results = Vec::new();
-        for handle in handles {
-            match handle.await {
-                Ok(result) => results.push(result),
-                Err(e) => {
-                    error!(target: "tool_registry", error = %e, "Failed to join tool execution task");
-                    // Create an error result for the failed task
-                    results.push(ToolResult {
-                        tool_call_id: "unknown".to_string(),
-                        result: None,
-                        error: Some(format!("Task join error: {}", e)),
-                    });
-                }
-            }
-        }
-
-        results
+    /// Execute multiple tool calls with custom timeout per tool
+    ///
+    /// # Arguments
+    /// * `tool_calls` - Vector of tool calls to execute
+    /// * `per_tool_timeout` - Timeout for each individual tool in milliseconds
+    ///
+    /// # Returns
+    /// * Vector of `ToolResult` in the same order as input
+    pub async fn execute_tools_with_timeout(
+        &self,
+        tool_calls: Vec<ToolCall>,
+        per_tool_timeout: u64,
+    ) -> Vec<ToolResult> {
+        let custom_registry = ToolRegistry {
+            tools: self.tools.clone(),
+            timeout_duration: Duration::from_millis(per_tool_timeout),
+        };
+        custom_registry.execute_tools(tool_calls).await
     }
 
     /// Helper method to clone the registry for parallel execution
@@ -471,7 +556,6 @@ impl ToolRegistry {
         }
     }
 }
-
 
 impl Default for ToolRegistry {
     fn default() -> Self {

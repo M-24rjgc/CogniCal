@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import { 
-  chatWithAgent, 
+import {
+  chatWithAgent,
   searchConversations as searchConversationsApi,
   exportConversation as exportConversationApi,
   clearConversation as clearConversationApi,
 } from '../services/tauriApi';
 import type { AppError } from '../services/tauriApi';
+import { useTaskStore } from './taskStore';
 
 export interface ChatMessage {
   id: string;
@@ -40,12 +41,21 @@ export interface ToolCallStatus {
   error?: string;
 }
 
+type AgentToolCall = {
+  id?: string;
+  name?: string;
+  result?: unknown;
+};
+
 export interface MemorySearchResult {
   conversationId: string;
   userMessage: string;
   assistantMessage: string;
   timestamp: string;
   relevanceScore: number;
+  metadata?: {
+    topics?: string;
+  };
 }
 
 interface ChatStoreState {
@@ -62,6 +72,30 @@ interface ChatStoreState {
   exportConversation: () => Promise<string>;
   clearConversation: () => Promise<void>;
 }
+
+const TASK_SYNC_TOOLS = new Set([
+  'create_task',
+  'update_task',
+  'delete_task',
+  'create_time_block',
+  'update_time_item',
+  'quick_schedule',
+  'associate_task_with_goal',
+  'add_task_dependency',
+  'remove_task_dependency',
+]);
+
+const syncStoresAfterTools = (toolsExecuted?: string[]) => {
+  if (!toolsExecuted || toolsExecuted.length === 0) {
+    return;
+  }
+
+  const shouldRefreshTasks = toolsExecuted.some((tool) => TASK_SYNC_TOOLS.has(tool));
+  if (shouldRefreshTasks) {
+    const { fetchTasks } = useTaskStore.getState();
+    void fetchTasks();
+  }
+};
 
 // Generate a unique conversation ID
 const generateConversationId = (): string => {
@@ -97,15 +131,18 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
       // Update tool call status if there are tool calls
       if (response.toolCalls && response.toolCalls.length > 0) {
-        const toolCallStatuses: ToolCallStatus[] = response.toolCalls.map((toolCall: any) => ({
-          id: toolCall.id || `tool-${Date.now()}-${Math.random()}`,
-          toolName: toolCall.name || 'unknown',
+        const toolCalls = response.toolCalls as AgentToolCall[];
+        const toolCallStatuses: ToolCallStatus[] = toolCalls.map((toolCall) => ({
+          id: toolCall.id ?? `tool-${Date.now()}-${Math.random()}`,
+          toolName: toolCall.name ?? 'unknown',
           status: 'completed' as const,
           result: toolCall.result,
         }));
-        
+
         set({ toolCalls: toolCallStatuses });
       }
+
+      syncStoresAfterTools(response.metadata?.toolsExecuted);
 
       const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
@@ -136,12 +173,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
   },
 
   clearMessages: () => {
-    set({ 
-      messages: [], 
+    set({
+      messages: [],
       conversationId: generateConversationId(),
       toolCalls: [],
       searchResults: [],
-      error: null 
+      error: null,
     });
   },
 
@@ -161,8 +198,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
       set({ searchResults: results, isLoading: false });
       return results;
     } catch (error) {
-      set({ 
-        isLoading: false, 
+      set({
+        isLoading: false,
         error: error as AppError,
         searchResults: [],
       });
@@ -172,15 +209,15 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
   exportConversation: async (): Promise<string> => {
     const { conversationId } = get();
-    
+
     try {
       set({ isLoading: true, error: null });
       const exportPath = await exportConversationApi(conversationId);
       set({ isLoading: false });
       return exportPath;
     } catch (error) {
-      set({ 
-        isLoading: false, 
+      set({
+        isLoading: false,
         error: error as AppError,
       });
       throw error;
@@ -189,12 +226,12 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
 
   clearConversation: async (): Promise<void> => {
     const { conversationId } = get();
-    
+
     // Show confirmation dialog
     const confirmed = window.confirm(
-      '确定要清除当前对话历史吗？此操作将归档对话记录，但不会永久删除。'
+      '确定要清除当前对话历史吗？此操作将归档对话记录，但不会永久删除。',
     );
-    
+
     if (!confirmed) {
       return;
     }
@@ -202,10 +239,10 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       await clearConversationApi(conversationId);
-      
+
       // Reset the chat state
-      set({ 
-        messages: [], 
+      set({
+        messages: [],
         conversationId: generateConversationId(),
         toolCalls: [],
         searchResults: [],
@@ -213,8 +250,8 @@ export const useChatStore = create<ChatStoreState>((set, get) => ({
         error: null,
       });
     } catch (error) {
-      set({ 
-        isLoading: false, 
+      set({
+        isLoading: false,
         error: error as AppError,
       });
       throw error;

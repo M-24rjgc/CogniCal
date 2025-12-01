@@ -1,7 +1,8 @@
-import { Bot, User, Brain, Clock, Zap, AlertTriangle, CloudOff } from 'lucide-react';
+import { Bot, User, Clock, Zap, AlertTriangle, CloudOff } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { ToolCallIndicator } from './ToolCallIndicator';
 import { ErrorDetailsPanel } from './ErrorDetailsPanel';
+import { MemoryContextIndicator } from './MemoryContextIndicator';
 import type { ChatMessage, ToolCallStatus } from '../../stores/chatStore';
 
 interface MessageBubbleProps {
@@ -10,50 +11,43 @@ interface MessageBubbleProps {
   showMetrics?: boolean;
 }
 
-export function MessageBubble({ message, toolCalls = [], showMetrics = false }: MessageBubbleProps) {
+export function MessageBubble({
+  message,
+  toolCalls = [],
+  showMetrics = false,
+}: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const time = new Date(message.timestamp).toLocaleTimeString('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
   });
 
-  const hasMetadata = message.metadata && (
-    message.metadata.tokensUsed ||
-    message.metadata.latencyMs !== undefined ||
-    message.metadata.memoryEntriesUsed !== undefined ||
-    (message.metadata.toolsExecuted && message.metadata.toolsExecuted.length > 0)
-  );
+  const hasMetadata =
+    message.metadata &&
+    (message.metadata.tokensUsed ||
+      message.metadata.latencyMs !== undefined ||
+      message.metadata.memoryEntriesUsed !== undefined ||
+      (message.metadata.toolsExecuted && message.metadata.toolsExecuted.length > 0));
 
-  const hasMemoryContext = message.metadata?.memoryEntriesUsed && message.metadata.memoryEntriesUsed > 0;
+  const hasMemoryContext =
+    message.metadata?.memoryEntriesUsed && message.metadata.memoryEntriesUsed > 0;
   const memoryUnavailable = message.metadata?.memoryAvailable === false;
   const hasErrors = message.metadata?.errors && message.metadata.errors.length > 0;
 
   return (
-    <div
-      className={cn(
-        'flex items-start gap-3',
-        isUser && 'flex-row-reverse',
-      )}
-    >
+    <div className={cn('flex items-start gap-3', isUser && 'flex-row-reverse')}>
       {/* Avatar */}
       <div
         className={cn(
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          isUser
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-primary/10 text-primary',
+          isUser ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary',
         )}
       >
         {isUser ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
       </div>
 
       {/* Message Content */}
-      <div
-        className={cn(
-          'flex-1 space-y-2',
-          isUser && 'flex flex-col items-end',
-        )}
-      >
+      <div className={cn('flex-1 space-y-2', isUser && 'flex flex-col items-end')}>
         {/* Memory Unavailable Warning */}
         {!isUser && memoryUnavailable && (
           <div className="flex items-center gap-1.5 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-2 py-1 text-xs text-yellow-600 dark:text-yellow-400">
@@ -64,24 +58,24 @@ export function MessageBubble({ message, toolCalls = [], showMetrics = false }: 
 
         {/* Memory Context Indicator */}
         {!isUser && hasMemoryContext && (
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Brain className="h-3.5 w-3.5" />
-            <span>使用了 {message.metadata?.memoryEntriesUsed} 条记忆上下文</span>
-          </div>
+          <MemoryContextIndicator
+            memoryEntriesUsed={message.metadata?.memoryEntriesUsed || 0}
+            className="mb-2"
+          />
         )}
 
         {/* Error Display - Use ErrorDetailsPanel when metrics enabled, show simple errors otherwise */}
         {!isUser && hasErrors && (
           <>
             {showMetrics ? (
-              <ErrorDetailsPanel 
+              <ErrorDetailsPanel
                 errors={message.metadata?.errors || []}
                 correlationId={message.metadata?.correlationId}
               />
             ) : (
               <div className="space-y-1">
                 {message.metadata?.errors
-                  ?.filter(error => error.errorType === 'tool_execution')
+                  ?.filter((error) => error.errorType === 'tool_execution')
                   .map((error, idx) => (
                     <div
                       key={idx}
@@ -108,9 +102,7 @@ export function MessageBubble({ message, toolCalls = [], showMetrics = false }: 
               : 'border-border/60 bg-background/80 text-foreground',
           )}
         >
-          <p className="whitespace-pre-wrap text-sm leading-relaxed">
-            {message.content}
-          </p>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
         </div>
 
         {/* Tool Calls Display */}
@@ -132,7 +124,7 @@ export function MessageBubble({ message, toolCalls = [], showMetrics = false }: 
                   <span>{message.metadata.latencyMs}ms</span>
                 </div>
               )}
-              
+
               {message.metadata?.tokensUsed && (
                 <div className="flex items-center gap-1">
                   <Zap className="h-3 w-3" />
@@ -153,9 +145,7 @@ export function MessageBubble({ message, toolCalls = [], showMetrics = false }: 
             {/* Error count indicator */}
             {hasErrors && (
               <div className="text-xs text-muted-foreground">
-                <span className="opacity-60">
-                  {message.metadata?.errors?.length} 个错误/警告
-                </span>
+                <span className="opacity-60">{message.metadata?.errors?.length} 个错误/警告</span>
               </div>
             )}
           </div>

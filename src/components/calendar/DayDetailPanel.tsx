@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import type { Task } from '../../types/task';
 import type { PlanningOptionView } from '../../types/planning';
+import { parseDateTime } from '../../utils/date';
 
 interface DayDetailPanelProps {
   date: Date;
@@ -52,7 +53,7 @@ export function DayDetailPanel({
   }).format(date);
 
   const sortedBlocks = [...blocks].sort(
-    (a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime(),
+    (a, b) => parseDateTime(a.startAt).getTime() - parseDateTime(b.startAt).getTime(),
   );
 
   return (
@@ -82,14 +83,15 @@ export function DayDetailPanel({
             <div className="space-y-2">
               {sortedBlocks.map((block) => {
                 const taskTitle = taskTitles[block.taskId] ?? `任务 ${block.taskId}`;
-                const start = new Date(block.startAt);
-                const end = new Date(block.endAt);
+                const start = parseDateTime(block.startAt);
+                const end = parseDateTime(block.endAt);
                 const duration = Math.round((end.getTime() - start.getTime()) / 60000);
 
                 return (
-                  <div
+                  <button
                     key={block.id}
-                    className="rounded-2xl border border-primary/40 bg-primary/5 p-3 cursor-pointer hover:bg-primary/10 transition"
+                    type="button"
+                    className="w-full rounded-2xl border border-primary/40 bg-primary/5 p-3 cursor-pointer hover:bg-primary/10 transition text-left"
                     onClick={() => onBlockClick?.(block)}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -116,7 +118,7 @@ export function DayDetailPanel({
                         )}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -132,9 +134,10 @@ export function DayDetailPanel({
             </div>
             <div className="space-y-2">
               {tasks.map((task) => (
-                <div
+                <button
                   key={task.id}
-                  className="rounded-2xl border border-border/60 bg-background/80 p-3 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition"
+                  type="button"
+                  className="w-full rounded-2xl border border-border/60 bg-background/80 p-3 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition text-left"
                   onClick={() => onTaskClick?.(task)}
                 >
                   <div className="flex items-start justify-between gap-2">
@@ -148,7 +151,7 @@ export function DayDetailPanel({
                       {task.dueAt && (
                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Clock3 className="h-3 w-3" />
-                          <span>截止 {TIME_FORMATTER.format(new Date(task.dueAt))}</span>
+                          <span>截止 {TIME_FORMATTER.format(parseDateTime(task.dueAt))}</span>
                         </div>
                       )}
                     </div>
@@ -161,7 +164,7 @@ export function DayDetailPanel({
                       </Badge>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </section>

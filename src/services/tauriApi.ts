@@ -9,6 +9,8 @@ import {
   type TaskUpdatePayload,
   type TaskParseRequest,
   type TaskParseResponse,
+  type RecurringTaskTemplate,
+  type TaskInstance,
 } from '../types/task';
 import {
   analyticsExportParamsSchema,
@@ -255,6 +257,17 @@ const COMMANDS = {
   DASHBOARD_CONFIG_GET: 'dashboard_config_get',
   DASHBOARD_CONFIG_UPDATE: 'dashboard_config_update',
   CACHE_CLEAR_ALL: 'cache_clear_all',
+  // Recurring task commands
+  RECURRING_TEMPLATES_LIST: 'recurring_templates_list',
+  RECURRING_TEMPLATE_CREATE: 'recurring_template_create',
+  RECURRING_TEMPLATE_UPDATE: 'recurring_template_update',
+  RECURRING_TEMPLATE_DELETE: 'recurring_template_delete',
+  RECURRING_TEMPLATE_GET: 'recurring_template_get',
+  RECURRING_TEMPLATE_INSTANCES: 'recurring_template_instances',
+  RECURRING_INSTANCES_BULK_UPDATE: 'recurring_instances_bulk_update',
+  RECURRING_INSTANCES_BULK_DELETE: 'recurring_instances_bulk_delete',
+  RECURRING_GENERATE_INSTANCES: 'recurring_generate_instances',
+  RECURRING_TASK_TO_REGULAR: 'recurring_task_to_regular',
 } as const;
 
 const isTauriAvailable = () => {
@@ -2538,6 +2551,9 @@ export interface MemorySearchResult {
   assistantMessage: string;
   timestamp: string;
   relevanceScore: number;
+  metadata?: {
+    topics?: string;
+  };
 }
 
 export const searchConversations = async (query: string): Promise<MemorySearchResult[]> => {
@@ -2557,8 +2573,19 @@ export const searchConversations = async (query: string): Promise<MemorySearchRe
 export const exportConversation = async (conversationId: string): Promise<string> => {
   if (isTauriAvailable()) {
     try {
-      const response = await invoke<{ path: string }>('memory_export', { conversationId });
-      return response.path;
+      // Export to app data directory to avoid permission issues
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const exportPath = `exports/conversation-${conversationId}-${timestamp}.zip`;
+      const response = await invoke<{ success: boolean; path: string; message: string }>(
+        'memory_export',
+        { path: exportPath },
+      );
+
+      if (response.success) {
+        return response.path;
+      } else {
+        throw new Error(`导出失败: ${response.message}`);
+      }
     } catch (error) {
       throw mapUnknownError(error);
     }
@@ -2579,10 +2606,6 @@ export const clearConversation = async (conversationId: string): Promise<void> =
 
   warnMockUsage();
 };
-
-
-
-
 
 export interface InitializeKnowledgeBaseResponse {
   success: boolean;
@@ -2612,4 +2635,160 @@ export const initializeKnowledgeBase = async (
   };
 };
 
+// Recurring Task APIs
+export interface RecurringTemplateFilters {
+  isActive?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
 
+export interface CreateRecurringTaskInput {
+  title: string;
+  description?: string;
+  recurrenceRule: string;
+  priority?: string;
+  tags?: string[];
+  estimatedMinutes?: number;
+}
+
+export interface UpdateRecurringTaskInput {
+  title?: string;
+  description?: string;
+  recurrenceRule?: string;
+  priority?: string;
+  tags?: string[];
+  estimatedMinutes?: number;
+  isActive?: boolean;
+}
+
+export interface RecurringTaskTemplateResponse {
+  templates: RecurringTaskTemplate[];
+  total: number;
+}
+
+export interface TaskInstanceResponse {
+  instances: TaskInstance[];
+  total: number;
+  template?: RecurringTaskTemplate;
+}
+
+export const listRecurringTemplates = async (
+  filters?: RecurringTemplateFilters,
+): Promise<RecurringTaskTemplateResponse> => {
+  try {
+    return await invokeOrMock<RecurringTaskTemplateResponse>(COMMANDS.RECURRING_TEMPLATES_LIST, {
+      filters,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const createRecurringTemplate = async (
+  input: CreateRecurringTaskInput,
+): Promise<RecurringTaskTemplate> => {
+  try {
+    return await invokeOrMock<RecurringTaskTemplate>(COMMANDS.RECURRING_TEMPLATE_CREATE, { input });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const updateRecurringTemplate = async (
+  id: string,
+  input: UpdateRecurringTaskInput,
+): Promise<RecurringTaskTemplate> => {
+  try {
+    return await invokeOrMock<RecurringTaskTemplate>(COMMANDS.RECURRING_TEMPLATE_UPDATE, {
+      id,
+      input,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const deleteRecurringTemplate = async (id: string): Promise<void> => {
+  try {
+    await invokeOrMock<void>(COMMANDS.RECURRING_TEMPLATE_DELETE, { id });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const getRecurringTemplate = async (id: string): Promise<RecurringTaskTemplate> => {
+  try {
+    return await invokeOrMock<RecurringTaskTemplate>(COMMANDS.RECURRING_TEMPLATE_GET, { id });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const getRecurringTemplateInstances = async (
+  id: string,
+  startDate?: string,
+  endDate?: string,
+  limit?: number,
+): Promise<TaskInstanceResponse> => {
+  try {
+    return await invokeOrMock<TaskInstanceResponse>(COMMANDS.RECURRING_TEMPLATE_INSTANCES, {
+      id,
+      start_date: startDate,
+      end_date: endDate,
+      limit,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const bulkUpdateTaskInstances = async (
+  instanceIds: string[],
+  updateData: Record<string, unknown>,
+): Promise<TaskInstance[]> => {
+  try {
+    return await invokeOrMock<TaskInstance[]>(COMMANDS.RECURRING_INSTANCES_BULK_UPDATE, {
+      instance_ids: instanceIds,
+      update_data: updateData,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const bulkDeleteTaskInstances = async (instanceIds: string[]): Promise<void> => {
+  try {
+    await invokeOrMock<void>(COMMANDS.RECURRING_INSTANCES_BULK_DELETE, {
+      instance_ids: instanceIds,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const generateRecurringInstances = async (
+  templateId: string,
+  startDate: string,
+  endDate: string,
+): Promise<TaskInstance[]> => {
+  try {
+    return await invokeOrMock<TaskInstance[]>(COMMANDS.RECURRING_GENERATE_INSTANCES, {
+      template_id: templateId,
+      start_date: startDate,
+      end_date: endDate,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};
+
+export const convertRecurringTaskToRegular = async (instanceId: string): Promise<string> => {
+  try {
+    return await invokeOrMock<string>(COMMANDS.RECURRING_TASK_TO_REGULAR, {
+      instance_id: instanceId,
+    });
+  } catch (error) {
+    throw mapUnknownError(error);
+  }
+};

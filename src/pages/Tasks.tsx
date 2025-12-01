@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { BarChart3, Plus, RefreshCcw, Search } from 'lucide-react';
+import { BarChart3, Plus, RefreshCcw, Search, Repeat } from 'lucide-react';
 import { TaskDetailsDrawer } from '../components/tasks/TaskDetailsDrawer';
 import { TaskFormDialog } from '../components/tasks/TaskFormDialog';
 import { TaskPlanningPanel } from '../components/tasks/TaskPlanningPanel';
 import { TaskTable } from '../components/tasks/TaskTable';
+import { RecurringTaskForm } from '../components/tasks/RecurringTaskForm';
+import { TaskInstanceManager } from '../components/tasks/TaskInstanceManager';
+import { TaskInstanceEditDialog } from '../components/tasks/TaskInstanceEditDialog';
+import { DependencyGraphContainer } from '../components/tasks/DependencyGraphContainer';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { useTaskForm, type TaskFormValues } from '../hooks/useTaskForm';
 import { useTasks } from '../hooks/useTasks';
+import { useRecurringTasks } from '../hooks/useRecurringTasks';
 import { FOCUS_SEARCH_EVENT_NAME } from '../hooks/useKeyboardShortcuts';
 import { useAnalyticsStore } from '../stores/analyticsStore';
 import { useSettingsStore } from '../stores/settingsStore';
-import type { Task, TaskAISource, TaskStatus } from '../types/task';
+import type { Task, TaskAISource, TaskStatus, TaskInstance, RecurringTaskTemplate } from '../types/task';
 import { TASK_STATUSES } from '../types/task';
 import { pushToast } from '../stores/uiStore';
 import type { AnalyticsRangeKey } from '../types/analytics';
@@ -65,7 +70,33 @@ export default function TasksPage() {
   const planningPanelRef = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Recurring task state
+  const [isRecurringFormOpen, setIsRecurringFormOpen] = useState(false);
+  const [recurringFormMode, setRecurringFormMode] = useState<'create' | 'edit'>('create');
+  const [editingTemplate, setEditingTemplate] = useState<RecurringTaskTemplate | null>(null);
+  const [recurringFormError, setRecurringFormError] = useState<string | null>(null);
+  
+  // Instance management state
+  const [isInstanceManagerOpen, setIsInstanceManagerOpen] = useState(false);
+  const [managingTemplate, setManagingTemplate] = useState<RecurringTaskTemplate | null>(null);
+  const [isInstanceEditOpen, setIsInstanceEditOpen] = useState(false);
+  const [editingInstance, setEditingInstance] = useState<TaskInstance | null>(null);
+  const [instanceEditType, setInstanceEditType] = useState<'single' | 'series'>('single');
+
   const { form, resetForm, setFromTask, aiState, triggerAiParse, clearAiState } = useTaskForm();
+  
+  const {
+    instances,
+    isLoading: isRecurringLoading,
+    isMutating: isRecurringMutating,
+    createRecurringTask,
+    updateRecurringTask,
+    fetchInstances,
+    updateInstance,
+    deleteInstance,
+    bulkUpdateInstances,
+    bulkDeleteInstances,
+  } = useRecurringTasks();
 
   const selectedTask = useMemo(
     () => tasks.find((task) => task.id === selectedTaskId) ?? null,
@@ -302,6 +333,124 @@ export default function TasksPage() {
     [deleteTask, selectTask, selectedTaskId],
   );
 
+  // Recurring task handlers
+  const openRecurringTaskDialog = useCallback(() => {
+    setRecurringFormMode('create');
+    setEditingTemplate(null);
+    setRecurringFormError(null);
+    setIsRecurringFormOpen(true);
+  }, []);
+
+  const handleManageRecurringInstances = useCallback(async (task: Task) => {
+    if (!task.isRecurring) return;
+    
+    // In a real implementation, we would fetch the template and instances
+    // For now, we'll create mock data
+    const mockTemplate: RecurringTaskTemplate = {
+      id: `template_${task.id}`,
+      title: task.title,
+      description: task.description,
+      recurrenceRule: {
+        frequency: 'daily',
+        interval: 1,
+        endType: 'never',
+      },
+      priority: task.priority,
+      tags: task.tags,
+      estimatedMinutes: task.estimatedMinutes,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      isActive: true,
+    };
+    
+    setManagingTemplate(mockTemplate);
+    await fetchInstances(mockTemplate.id);
+    setIsInstanceManagerOpen(true);
+  }, [fetchInstances]);
+
+  const handleEditRecurringTemplate = useCallback((task: Task) => {
+    if (!task.isRecurring) return;
+    
+    // In a real implementation, we would fetch the template
+    const mockTemplate: RecurringTaskTemplate = {
+      id: `template_${task.id}`,
+      title: task.title,
+      description: task.description,
+      recurrenceRule: {
+        frequency: 'daily',
+        interval: 1,
+        endType: 'never',
+      },
+      priority: task.priority,
+      tags: task.tags,
+      estimatedMinutes: task.estimatedMinutes,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      isActive: true,
+    };
+    
+    setRecurringFormMode('edit');
+    setEditingTemplate(mockTemplate);
+    setRecurringFormError(null);
+    setIsRecurringFormOpen(true);
+  }, []);
+
+  const handleRecurringFormSubmit = useCallback(async (values: any) => {
+    setRecurringFormError(null);
+    
+    try {
+      if (recurringFormMode === 'create') {
+        await createRecurringTask(values);
+        setIsRecurringFormOpen(false);
+      } else if (recurringFormMode === 'edit' && editingTemplate) {
+        await updateRecurringTask(editingTemplate.id, values);
+        setIsRecurringFormOpen(false);
+      }
+    } catch (err) {
+      const message = (err as { message?: string })?.message ?? '操作失败，请稍后重试。';
+      setRecurringFormError(message);
+    }
+  }, [recurringFormMode, editingTemplate, createRecurringTask, updateRecurringTask]);
+
+  const handleInstanceEdit = useCallback((instance: TaskInstance, editType: 'single' | 'series') => {
+    setEditingInstance(instance);
+    setInstanceEditType(editType);
+    setIsInstanceEditOpen(true);
+  }, []);
+
+  const handleInstanceEditSubmit = useCallback(async (
+    values: any,
+    editType: 'single' | 'series',
+    instanceId: string
+  ) => {
+    try {
+      await updateInstance(instanceId, values, editType);
+      setIsInstanceEditOpen(false);
+      setEditingInstance(null);
+    } catch (err) {
+      console.error('Failed to update instance:', err);
+    }
+  }, [updateInstance]);
+
+  const handleInstanceDelete = useCallback(async (instanceId: string, deleteType: 'single' | 'series') => {
+    const confirmed = window.confirm(
+      deleteType === 'single' 
+        ? '确定删除此任务实例吗？' 
+        : '确定删除整个重复任务系列吗？此操作不可撤销。'
+    );
+    if (!confirmed) return;
+    
+    try {
+      await deleteInstance(instanceId, deleteType);
+      if (deleteType === 'series') {
+        setIsInstanceManagerOpen(false);
+        setManagingTemplate(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete instance:', err);
+    }
+  }, [deleteInstance]);
+
   const lastFetchedLabel = lastFetchedAt
     ? new Date(lastFetchedAt).toLocaleString('zh-CN')
     : '尚未加载';
@@ -354,6 +503,14 @@ export default function TasksPage() {
               disabled={isLoading}
             >
               <RefreshCcw className="mr-2 h-4 w-4" /> 刷新
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openRecurringTaskDialog}
+              disabled={isMutating}
+            >
+              <Repeat className="mr-2 h-4 w-4" /> 重复任务
             </Button>
             <Button
               type="button"
@@ -506,7 +663,23 @@ export default function TasksPage() {
         onEditTask={openEditDialog}
         onDeleteTask={handleDeleteTask}
         onPlanTask={handlePlanTask}
+        onManageRecurringInstances={handleManageRecurringInstances}
+        onEditRecurringTemplate={handleEditRecurringTemplate}
       />
+
+      {/* Dependency Graph Visualization */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xl font-semibold">任务依赖关系图</h2>
+        </div>
+        <DependencyGraphContainer
+          tasks={tasks}
+          onTaskClick={(taskId) => {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) handleSelectTask(task);
+          }}
+        />
+      </section>
 
       <div ref={planningPanelRef}>
         <TaskPlanningPanel
@@ -547,6 +720,40 @@ export default function TasksPage() {
         onDelete={handleDeleteTask}
         onPlanTask={handlePlanTask}
         isMutating={isMutating}
+      />
+
+      {/* Recurring Task Dialogs */}
+      <RecurringTaskForm
+        open={isRecurringFormOpen}
+        mode={recurringFormMode}
+        template={editingTemplate || undefined}
+        onOpenChange={setIsRecurringFormOpen}
+        onSubmit={handleRecurringFormSubmit}
+        isSubmitting={isRecurringMutating}
+        serverError={recurringFormError}
+      />
+
+      <TaskInstanceManager
+        open={isInstanceManagerOpen}
+        template={managingTemplate || undefined}
+        instances={instances}
+        onOpenChange={setIsInstanceManagerOpen}
+        onEditInstance={handleInstanceEdit}
+        onDeleteInstance={handleInstanceDelete}
+        onBulkStatusUpdate={bulkUpdateInstances}
+        onBulkDelete={bulkDeleteInstances}
+        isLoading={isRecurringLoading}
+      />
+
+      <TaskInstanceEditDialog
+        open={isInstanceEditOpen}
+        instance={editingInstance}
+        template={managingTemplate || undefined}
+        editType={instanceEditType}
+        onOpenChange={setIsInstanceEditOpen}
+        onSubmit={handleInstanceEditSubmit}
+        onEditTypeChange={setInstanceEditType}
+        isSubmitting={isRecurringMutating}
       />
     </section>
   );

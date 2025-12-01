@@ -8,10 +8,25 @@ import {
   searchMemory,
   storeConversation,
 } from '../services/pythonMemory';
+import type {
+  MemoryStatus,
+  MemoryInitResponse,
+  MemorySearchResponse,
+  MemoryStoreResponse,
+} from '../services/pythonMemory';
+
+type ConnectionTestResult = Awaited<ReturnType<typeof testConnection>>;
+type StatusState = (MemoryStatus & { error?: string }) | null;
+type PythonTestResult =
+  | MemoryInitResponse
+  | MemorySearchResponse
+  | MemoryStoreResponse
+  | ConnectionTestResult
+  | { success: false; error: string; message?: string };
 
 export default function PythonTestPage() {
-  const [status, setStatus] = useState<any>(null);
-  const [testResult, setTestResult] = useState<any>(null);
+  const [status, setStatus] = useState<StatusState>(null);
+  const [testResult, setTestResult] = useState<PythonTestResult | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleTestConnection = async () => {
@@ -31,7 +46,13 @@ export default function PythonTestPage() {
       const result = await getMemoryStatus();
       setStatus(result);
     } catch (error) {
-      setStatus({ error: String(error) });
+      setStatus({
+        initialized: false,
+        available: false,
+        kb_path: null,
+        python_version: 'unknown',
+        error: String(error),
+      });
     }
     setLoading(false);
   };
@@ -64,12 +85,9 @@ export default function PythonTestPage() {
   const handleTestStore = async () => {
     setLoading(true);
     try {
-      const result = await storeConversation(
-        'test-conv-123',
-        'Hello from user',
-        'Hello from AI',
-        { test: 'true' },
-      );
+      const result = await storeConversation('test-conv-123', 'Hello from user', 'Hello from AI', {
+        test: 'true',
+      });
       setTestResult(result);
     } catch (error) {
       setTestResult({ success: false, error: String(error) });
@@ -99,8 +117,6 @@ export default function PythonTestPage() {
                   {status.available ? 'Yes' : 'No'}
                 </Badge>
               </div>
-              <div>
-
 
               {status.kb_path && (
                 <div>
@@ -113,6 +129,11 @@ export default function PythonTestPage() {
                 </div>
               )}
 
+              {status.error && (
+                <div className="text-xs text-red-600">
+                  <strong>Error:</strong> {status.error}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -121,9 +142,7 @@ export default function PythonTestPage() {
         {testResult && (
           <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
             <h2 className="text-xl font-semibold mb-2">Test Result</h2>
-            <pre className="text-xs overflow-auto">
-              {JSON.stringify(testResult, null, 2)}
-            </pre>
+            <pre className="text-xs overflow-auto">{JSON.stringify(testResult, null, 2)}</pre>
           </div>
         )}
 
@@ -173,10 +192,10 @@ export default function PythonTestPage() {
       <div className="mt-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
         <h3 className="font-semibold mb-2">Instructions</h3>
         <ol className="list-decimal list-inside space-y-1 text-sm">
-          <li>Click "Test Connection" to verify Python plugin works</li>
-          <li>Click "Get Status" to check memory service status</li>
-          <li>Click "Initialize Memory" to set up the knowledge base</li>
-          <li>Click "Test Search" and "Test Store" to test operations</li>
+          <li>Click &quot;Test Connection&quot; to verify Python plugin works</li>
+          <li>Click &quot;Get Status&quot; to check memory service status</li>
+          <li>Click &quot;Initialize Memory&quot; to set up the knowledge base</li>
+          <li>Click &quot;Test Search&quot; and &quot;Test Store&quot; to test operations</li>
         </ol>
       </div>
     </div>

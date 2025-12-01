@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
+import { extractDateKey, formatDateKey, isSameDay, parseDateTime } from '../../utils/date';
 import type { Task } from '../../types/task';
 import type { PlanningOptionView } from '../../types/planning';
 
@@ -13,6 +14,7 @@ interface CalendarViewProps {
   onTaskClick?: (task: Task) => void;
   onBlockClick?: (block: PlanningOptionView['blocks'][number]) => void;
   className?: string;
+  selectedDate?: Date | null;
 }
 
 interface CalendarDay {
@@ -24,6 +26,10 @@ interface CalendarDay {
 }
 
 const WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+const TIME_FORMATTER = new Intl.DateTimeFormat('zh-CN', {
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 export function CalendarView({
   tasks,
@@ -32,6 +38,7 @@ export function CalendarView({
   onTaskClick,
   onBlockClick,
   className,
+  selectedDate,
 }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -154,6 +161,7 @@ export function CalendarView({
               onDateClick={onDateClick}
               onTaskClick={onTaskClick}
               onBlockClick={onBlockClick}
+              selectedDate={selectedDate}
             />
           ))}
         </div>
@@ -183,9 +191,16 @@ interface CalendarDayCellProps {
   onDateClick?: (date: Date) => void;
   onTaskClick?: (task: Task) => void;
   onBlockClick?: (block: PlanningOptionView['blocks'][number]) => void;
+  selectedDate?: Date | null;
 }
 
-function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: CalendarDayCellProps) {
+function CalendarDayCell({
+  day,
+  onDateClick,
+  onTaskClick,
+  onBlockClick,
+  selectedDate,
+}: CalendarDayCellProps) {
   const dayNumber = day.date.getDate();
   const hasTasks = day.tasks.length > 0;
   const hasBlocks = day.blocks.length > 0;
@@ -193,28 +208,43 @@ function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: Calend
 
   const completedTasks = day.tasks.filter((t) => t.status === 'done').length;
   const totalTasks = day.tasks.length;
+  const isSelected = isSameDay(day.date, selectedDate);
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={cn(
-        'group relative min-h-[100px] rounded-xl border p-2 transition-all cursor-pointer',
+        'group relative min-h-[100px] cursor-pointer rounded-xl border p-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
         day.isCurrentMonth
           ? 'border-border/60 bg-background hover:border-primary/40 hover:bg-primary/5'
           : 'border-border/30 bg-muted/30 hover:border-border/50',
-        day.isToday && 'ring-2 ring-primary/50 border-primary',
+        isSelected
+          ? 'border-primary bg-primary/10 ring-2 ring-primary/40'
+          : day.isToday
+            ? 'border-primary/40 ring-1 ring-primary/30'
+            : null,
       )}
       onClick={() => onDateClick?.(day.date)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onDateClick?.(day.date);
+        }
+      }}
     >
       {/* 日期数字 */}
       <div className="flex items-center justify-between mb-2">
         <span
           className={cn(
             'flex h-6 w-6 items-center justify-center rounded-full text-sm font-medium',
-            day.isToday
+            isSelected
               ? 'bg-primary text-primary-foreground'
-              : day.isCurrentMonth
-                ? 'text-foreground'
-                : 'text-muted-foreground',
+              : day.isToday
+                ? 'bg-primary/10 text-primary'
+                : day.isCurrentMonth
+                  ? 'text-foreground'
+                  : 'text-muted-foreground',
           )}
         >
           {dayNumber}
@@ -230,7 +260,7 @@ function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: Calend
       <div className="space-y-1">
         {/* 显示任务 */}
         {day.tasks.slice(0, 2).map((task) => (
-          <div
+          <button
             key={task.id}
             className={cn(
               'rounded px-1.5 py-0.5 text-[10px] leading-tight truncate cursor-pointer transition',
@@ -238,6 +268,7 @@ function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: Calend
                 ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/30'
                 : 'bg-sky-500/20 text-sky-700 dark:text-sky-300 hover:bg-sky-500/30',
             )}
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onTaskClick?.(task);
@@ -245,14 +276,15 @@ function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: Calend
             title={task.title}
           >
             {task.title}
-          </div>
+          </button>
         ))}
 
         {/* 显示规划时间块 */}
         {day.blocks.slice(0, 2).map((block) => (
-          <div
+          <button
             key={block.id}
             className="rounded px-1.5 py-0.5 text-[10px] leading-tight truncate cursor-pointer bg-primary/20 text-primary hover:bg-primary/30 transition"
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onBlockClick?.(block);
@@ -260,7 +292,7 @@ function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: Calend
             title={`${formatTime(block.startAt)} - ${formatTime(block.endAt)}`}
           >
             📅 {formatTime(block.startAt)}
-          </div>
+          </button>
         ))}
 
         {/* 更多指示器 */}
@@ -287,17 +319,11 @@ function CalendarDayCell({ day, onDateClick, onTaskClick, onBlockClick }: Calend
 }
 
 function getTasksForDate(date: Date, tasks: Task[]): Task[] {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateKey = formatDateKey(date);
   return tasks.filter((task) => {
-    if (task.dueAt) {
-      const dueDate = new Date(task.dueAt).toISOString().split('T')[0];
-      if (dueDate === dateStr) return true;
-    }
-    if (task.startAt) {
-      const startDate = new Date(task.startAt).toISOString().split('T')[0];
-      if (startDate === dateStr) return true;
-    }
-    return false;
+    const dueKey = task.dueAt ? extractDateKey(task.dueAt) : null;
+    const startKey = task.startAt ? extractDateKey(task.startAt) : null;
+    return dueKey === dateKey || startKey === dateKey;
   });
 }
 
@@ -305,17 +331,14 @@ function getBlocksForDate(
   date: Date,
   blocks: PlanningOptionView['blocks'],
 ): PlanningOptionView['blocks'] {
-  const dateStr = date.toISOString().split('T')[0];
+  const dateKey = formatDateKey(date);
   return blocks.filter((block) => {
-    const blockDate = new Date(block.startAt).toISOString().split('T')[0];
-    return blockDate === dateStr;
+    const blockKey = extractDateKey(block.startAt);
+    return blockKey === dateKey;
   });
 }
 
 function formatTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return new Intl.DateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
+  const date = parseDateTime(dateStr);
+  return TIME_FORMATTER.format(date);
 }

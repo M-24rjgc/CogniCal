@@ -1,4 +1,5 @@
 import {
+  Brain,
   CalendarDays,
   CheckSquare,
   HelpCircle,
@@ -7,6 +8,7 @@ import {
   Loader2,
   MessageSquare,
   Settings2,
+  Target,
 } from 'lucide-react';
 import {
   Link,
@@ -33,6 +35,8 @@ import { useTheme, type ThemeMode } from '../providers/theme-provider';
 import CalendarPage from '../pages/Calendar';
 import ChatPage from '../pages/Chat';
 import DashboardPage from '../pages/Dashboard';
+import GoalsPage from '../pages/Goals';
+import MemoryManagementPage from '../pages/MemoryManagement';
 import SettingsPage from '../pages/Settings';
 import TasksPage from '../pages/Tasks';
 import { HelpCenterDialog } from '../components/help/HelpCenterDialog';
@@ -275,7 +279,27 @@ function RootLayout() {
     (event) => {
       if (isOverlayOpen) return;
       event.preventDefault();
+      navigateWithReplace('/goals');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
+    'ctrl+5,meta+5',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
       navigateWithReplace('/chat');
+    },
+    [isOverlayOpen, navigateWithReplace],
+  );
+
+  useHotkeys(
+    'ctrl+6,meta+6',
+    (event) => {
+      if (isOverlayOpen) return;
+      event.preventDefault();
+      navigateWithReplace('/memory');
     },
     [isOverlayOpen, navigateWithReplace],
   );
@@ -330,7 +354,7 @@ function RootLayout() {
   );
 
   useHotkeys(
-    'd,t,c,a,s,p,h',
+    'd,t,c,g,a,m,s,p,h',
     (event) => {
       if (isOverlayOpen) return;
       if (!consumeGoSequence()) return;
@@ -346,8 +370,14 @@ function RootLayout() {
         case 'c':
           navigateWithReplace('/calendar');
           break;
+        case 'g':
+          navigateWithReplace('/goals');
+          break;
         case 'a':
           navigateWithReplace('/chat');
+          break;
+        case 'm':
+          navigateWithReplace('/memory');
           break;
         case 's':
           navigateWithReplace('/settings');
@@ -489,13 +519,31 @@ function RootLayout() {
         action: () => navigateWithReplace('/calendar'),
       },
       {
+        id: 'navigate-goals',
+        label: '前往目标管理',
+        description: '管理目标与任务分解',
+        category: '导航',
+        shortcut: 'Ctrl + 4',
+        keywords: ['goals', '目标', '分解'],
+        action: () => navigateWithReplace('/goals'),
+      },
+      {
         id: 'navigate-chat',
         label: '前往 AI 对话',
         description: '与 AI 助手自由对话',
         category: '导航',
-        shortcut: 'Ctrl + 4',
+        shortcut: 'Ctrl + 5',
         keywords: ['chat', 'ai', '对话', '聊天'],
         action: () => navigateWithReplace('/chat'),
+      },
+      {
+        id: 'navigate-memory',
+        label: '前往记忆管理',
+        description: '管理 AI 对话记忆与历史',
+        category: '导航',
+        shortcut: 'Ctrl + 6',
+        keywords: ['memory', '记忆', '历史', '管理'],
+        action: () => navigateWithReplace('/memory'),
       },
       {
         id: 'navigate-settings',
@@ -599,9 +647,11 @@ function RootLayout() {
           { keys: 'Ctrl / Cmd + 1', description: '前往仪表盘' },
           { keys: 'Ctrl / Cmd + 2', description: '前往任务中心' },
           { keys: 'Ctrl / Cmd + 3', description: '前往日历' },
-          { keys: 'Ctrl / Cmd + 4', description: '前往 AI 对话' },
+          { keys: 'Ctrl / Cmd + 4', description: '前往目标管理' },
+          { keys: 'Ctrl / Cmd + 5', description: '前往 AI 对话' },
+          { keys: 'Ctrl / Cmd + 6', description: '前往记忆管理' },
           { keys: 'Ctrl / Cmd + ,', description: '打开设置中心' },
-          { keys: 'G 然后 D / T / C / A / S', description: '使用 Go 序列跳转目标页面' },
+          { keys: 'G 然后 D / T / C / G / A / M / S', description: '使用 Go 序列跳转目标页面' },
         ],
       },
       {
@@ -644,10 +694,22 @@ function RootLayout() {
         to: '/calendar',
       },
       {
+        key: 'goals',
+        label: '目标管理',
+        icon: Target,
+        to: '/goals',
+      },
+      {
         key: 'chat',
         label: 'AI 对话',
         icon: MessageSquare,
         to: '/chat',
+      },
+      {
+        key: 'memory',
+        label: '记忆管理',
+        icon: Brain,
+        to: '/memory',
       },
       {
         key: 'settings',
@@ -711,11 +773,13 @@ export const router = createHashRouter([
       { index: true, element: <DashboardPage /> },
       { path: 'tasks', element: <TasksPage /> },
       { path: 'calendar', element: <CalendarPage /> },
+      { path: 'goals', element: <GoalsPage /> },
       { path: 'chat', element: <ChatPage /> },
+      { path: 'memory', element: <MemoryManagementPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
 ]);
 
-export type AppRoute = 'dashboard' | 'tasks' | 'calendar' | 'chat' | 'settings';
+export type AppRoute = 'dashboard' | 'tasks' | 'calendar' | 'chat' | 'memory' | 'settings';

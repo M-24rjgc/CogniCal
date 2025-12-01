@@ -18,12 +18,14 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useChatStore } from '../stores/chatStore';
 import { MessageBubble } from '../components/chat/MessageBubble';
 import { MemorySearchDialog } from '../components/chat/MemorySearchDialog';
+import { ConversationExportDialog } from '../components/chat/ConversationExportDialog';
 
 
 export default function ChatPage() {
   const [input, setInput] = useState('');
   const [showMetrics, setShowMetrics] = useState(false);
   const [isSearchDialogOpen, setIsSearchDialogOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -31,6 +33,7 @@ export default function ChatPage() {
   const hasDeepseekKey = useSettingsStore((state) => state.settings?.hasDeepseekKey ?? false);
   const {
     messages,
+    conversationId,
     toolCalls,
     isLoading,
     error,
@@ -90,13 +93,7 @@ export default function ChatPage() {
   };
 
   const handleExportConversation = async () => {
-    try {
-      const exportPath = await exportConversation();
-      alert(`对话已导出到: ${exportPath}`);
-    } catch (error) {
-      console.error('Failed to export conversation:', error);
-      alert('导出对话失败，请稍后重试');
-    }
+    return await exportConversation();
   };
 
   const handleSearchConversations = async (query: string) => {
@@ -147,7 +144,7 @@ export default function ChatPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={handleExportConversation}
+              onClick={() => setIsExportDialogOpen(true)}
               disabled={messages.length === 0}
             >
               <Download className="mr-2 h-4 w-4" />
@@ -339,6 +336,15 @@ export default function ChatPage() {
         isOpen={isSearchDialogOpen}
         onClose={() => setIsSearchDialogOpen(false)}
         onSearch={handleSearchConversations}
+      />
+
+      {/* Conversation Export Dialog */}
+      <ConversationExportDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        onExport={handleExportConversation}
+        conversationId={conversationId}
+        messageCount={messages.length}
       />
     </section>
   );
