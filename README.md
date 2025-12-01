@@ -1,252 +1,120 @@
-# 🎯 CogniCal - 智能任务与时间管理
+﻿#  CogniCal - 智能任务与时间管理
 
-> **版本**: v1.0.1014 | **发布日期**: 2025年10月14日  
-> **状态**: ✅ 正式版 (Production Ready)
-
-CogniCal 是一款基于 Tauri、React 和 TypeScript 构建的桌面应用,将任务管理转化为智能生产力助手。通过 AI 驱动的解析、规划和分析,帮助你更高效地管理时间和任务。
+[English](#english) | [中文](#中文)
 
 ---
 
-## ✨ 核心功能
+<a name="中文"></a>
+## 中文
 
-### 🎯 生产力评分系统
+> **版本**: v1.0.1014 | **状态**:  正式版
 
-- **Composite Score**: 0-100 productivity rating with dimension breakdowns
-- **Multi-dimensional Analysis**: Completion rate, consistency, focus time, workload balance
-- **Trend Tracking**: Weekly progress monitoring with actionable insights
-- **Smart Explanations**: AI-generated context for score changes
+CogniCal 是一款基于 **Tauri + React + Rust** 构建的智能桌面应用，通过 AI 驱动的任务解析、智能规划和数据分析，帮助你更高效地管理时间和任务。
 
-### 🤖 AI-Powered Recommendations
+###  核心功能
 
-- **Multi-Option Planning**: ≥3 plan options with confidence scoring
-- **Conflict Detection**: Automatic identification of scheduling conflicts
-- **Offline Fallbacks**: Heuristic algorithms when AI is unavailable
-- **Preference Learning**: Decision logging for personalized suggestions
+| 功能 | 描述 |
+|------|------|
+|  **生产力评分** | 0-100 综合评分，多维度分析（完成率、专注时间、工作负载） |
+|  **AI 智能规划** | 多方案推荐、冲突检测、离线降级算法 |
+|  **工作量预测** | 7/14/30 天容量预测，风险预警 |
+|  **健康提醒** | 专注时长检测、休息提醒、工作节奏分析 |
+|  **AI 对话助手** | 自然语言任务管理、工具调用、上下文记忆 |
+|  **智能日历** | 月视图、时间块可视化、任务依赖关系图 |
 
-### 📊 Workload Forecasting
+###  技术栈
 
-- **Multi-Horizon Predictions**: 7/14/30-day capacity planning
-- **Risk Assessment**: OK/Warning/Critical workload indicators
-- **Proactive Alerts**: Early warnings for capacity constraints
-- **Confidence Scoring**: Data quality-based forecast reliability
+- **后端**: Rust + Tauri 2 + SQLite
+- **前端**: React 19 + TypeScript 5.8 + Tailwind CSS
+- **状态管理**: Zustand + React Query
+- **AI**: DeepSeek API
 
-### 🧘 Wellness & Balance
+###  快速开始
 
-- **Focus Streak Detection**: 90+ minute continuous work alerts
-- **Work Streak Monitoring**: 4+ hour session break reminders
-- **Exponential Backoff**: Smart nudge frequency adjustment
-- **Weekly Summaries**: Compliance rates and rhythm analysis
+```bash
+# 克隆仓库
+git clone https://github.com/M-24rjgc/CogniCal.git
+cd CogniCal
 
-### 🤖 AI Agent with Memory
+# 安装依赖
+pnpm install
 
-- **Long-term Memory**: Semantic search-powered conversation history
-- **Tool Calling**: Natural language task and calendar management
-- **Context Awareness**: Remembers preferences and past discussions
-- **Multi-turn Conversations**: Complex workflows through dialogue
+# 开发运行
+pnpm tauri dev
+```
 
-### 🔒 Privacy-First AI Feedback
-
-- **👍/👎 Sentiment Capture**: Contextual feedback on AI features
-- **Automatic Anonymization**: Sensitive data redaction before storage
-- **Opt-Out Controls**: Complete privacy control for users
-- **Weekly Digests**: Aggregate insights from community feedback
-
-### 🌐 Community Transparency
-
-- **OSS Badges**: Open source licensing and contribution information
-- **Plugin Detection**: Automatic identification of extensions
-- **Anonymized Exports**: Privacy-protected data sharing
-- **Checksum Verification**: Export integrity validation
-
-## 🏗️ Architecture
-
-### Tech Stack
-
-- **Backend**: Rust + Tauri 2.8.5 + SQLite
-- **Frontend**: React 18 + TypeScript 5.8.3 + Tailwind CSS
-- **State Management**: Zustand + React Query
-- **Testing**: Vitest + Playwright
-
-### Key Services
-
-- `ProductivityScoreService` - Multi-dimensional scoring engine
-- `RecommendationOrchestrator` - AI + heuristic planning
-- `WorkloadForecastService` - Capacity prediction
-- `WellnessService` - Proactive balance monitoring
-- `FeedbackService` - Privacy-first AI feedback
-- `CommunityService` - Transparency and export
-- `AiAgentService` - Memory-enhanced AI with tool calling
-- `MemoryService` - Semantic conversation storage and retrieval
-- `ToolRegistry` - Dynamic tool registration and execution
-
-## 📦 Installation
-
-### Prerequisites
+###  环境要求
 
 - Node.js 18+
 - Rust 1.70+
-- Tauri CLI
-- Python 3.8+ (for AI Agent memory features)
+- pnpm
 
+###  配置
 
-### Quick Start
+在设置中配置 DeepSeek API 密钥即可启用 AI 功能。
+
+---
+
+<a name="english"></a>
+## English
+
+> **Version**: v1.0.1014 | **Status**:  Production Ready
+
+CogniCal is an intelligent desktop application built with **Tauri + React + Rust**, featuring AI-powered task parsing, smart planning, and data analytics to help you manage time and tasks more efficiently.
+
+###  Core Features
+
+| Feature | Description |
+|---------|-------------|
+|  **Productivity Score** | 0-100 composite score with multi-dimensional analysis |
+|  **AI Planning** | Multi-option recommendations, conflict detection, offline fallbacks |
+|  **Workload Forecast** | 7/14/30-day capacity prediction with risk alerts |
+|  **Wellness Reminders** | Focus streak detection, break reminders, rhythm analysis |
+|  **AI Chat Assistant** | Natural language task management with tool calling |
+|  **Smart Calendar** | Month view, time block visualization, dependency graphs |
+
+###  Tech Stack
+
+- **Backend**: Rust + Tauri 2 + SQLite
+- **Frontend**: React 19 + TypeScript 5.8 + Tailwind CSS
+- **State Management**: Zustand + React Query
+- **AI**: DeepSeek API
+
+###  Quick Start
 
 ```bash
 # Clone repository
-git clone <repository-url>
-cd cognical
+git clone https://github.com/M-24rjgc/CogniCal.git
+cd CogniCal
 
 # Install dependencies
 pnpm install
 
-
-
-# Build and run
+# Run in development
 pnpm tauri dev
 ```
 
-### AI Agent Setup
+###  Requirements
 
-#### Option 1: Embedded Python (Recommended)
+- Node.js 18+
+- Rust 1.70+
+- pnpm
 
-**Zero configuration** - Python runtime is bundled with the app:
+###  Configuration
 
-```bash
-# One-time setup for development
-.\setup_python.ps1
-
-# Then run normally
-pnpm tauri dev
-```
-
-For production builds, the embedded Python is automatically included.
-
-#### Option 2: System Python (Advanced)
-
-If you prefer to use your system Python:
-
-
-
-2. **Verify installation**:
-   - Launch CogniCal
-   - Go to Settings > AI Agent
-   - Check "Memory Status" indicator
-   - If green, memory features are active
-
-**Note**: The AI Agent works without memory features but will operate in stateless mode (no conversation history).
-
-### Development
-
-```bash
-# Frontend development
-pnpm dev
-
-# Backend development
-cd src-tauri && cargo watch -x run
-
-# Run tests
-pnpm test                    # Frontend tests
-cargo test --tests          # Backend tests
-pnpm exec playwright test   # E2E tests
-```
-
-## 🧪 Testing
-
-### Test Coverage
-
-- **81 Automated Tests** (59 Rust + 22 Frontend)
-- **8 E2E Scenarios** covering complete workflows
-- **100% Pass Rate** with deterministic behavior
-
-### Quality Assurance
-
-```bash
-# Full test suite
-pnpm test:all
-
-# Smoke testing
-pnpm test:smoke
-
-# Performance validation
-pnpm test:performance
-```
-
-## 🔧 Configuration
-
-### Key Settings
-
-- **Productivity Scoring**: Enable/disable scoring features
-- **AI Recommendations**: Configure DeepSeek API integration
-- **Wellness Nudges**: Set quiet hours and sensitivity
-- **Privacy Controls**: Manage data collection and sharing
-
-### Environment Variables
-
-```bash
-# DeepSeek API (required for AI features)
-DEEPSEEK_API_KEY=your_api_key
-
-# AI Agent Memory Configuration (optional)
-COGNICAL_KB_PATH=/path/to/knowledge_base    # Default: ~/.cognical/knowledge_base
-
-COGNICAL_MEMORY_SEARCH_LIMIT=10              # Max search results
-COGNICAL_MEMORY_ENABLE_GRAPH=true            # Enable knowledge graph
-
-# Tool Configuration (optional)
-COGNICAL_TOOLS_ENABLED=true                  # Enable/disable tool calling
-COGNICAL_TOOLS_TIMEOUT_MS=5000               # Tool execution timeout
-
-# Development flags
-TAURI_DEV=true
-RUST_LOG=info
-```
-
-## 📚 Documentation
-
-### User Documentation
-- [AI Agent User Guide](./docs/AI_AGENT_USER_GUIDE.md) - Complete guide to using AI Agent features
-- [Chat Feature Guide](./docs/CHAT_FEATURE.md) - Basic chat functionality
-- [Calendar Feature Guide](./docs/CALENDAR_FEATURE.md) - Calendar management
-
-### Developer Documentation
-- [AI Agent Developer Guide](./docs/AI_AGENT_DEVELOPER_GUIDE.md) - Extending the AI Agent with custom tools
-- [Phase 4 Architecture](./docs/architecture/phase4.md) - System design and data flows
-- [Type System Integration](./docs/phase4-type-system-integration.md) - API contracts and interfaces
-- [Test Coverage Report](./docs/PHASE4_TEST_COVERAGE.md) - Quality assurance details
-- [Smoke Checklist](./docs/SMOKE-CHECKLIST.md) - Release verification steps
-
-### Specifications
-- [AI Agent Requirements](./kiro/specs/ai-agent-with-memory/requirements.md) - Feature requirements
-- [AI Agent Design](./kiro/specs/ai-agent-with-memory/design.md) - Architecture and design decisions
-
-## 🤝 Contributing
-
-We welcome community contributions! Please see our:
-
-- [Community Guidelines](./docs/community/guidelines.md)
-- [Development Setup](./docs/development/setup.md)
-- [Code of Conduct](./docs/community/code-of-conduct.md)
-
-### Plugin Development
-
-CogniCal supports plugin extensions for:
-
-- Custom productivity metrics
-- Integration with external tools
-- Alternative recommendation algorithms
-- Enhanced visualization components
-
-## 📄 License
-
-MIT License - See [LICENSE](./LICENSE) for details.
-
-## 🐛 Support
-
-- **Issues**: [GitHub Issues](https://github.com/your-org/cognical/issues)
-- **Discussions**: [Community Forum](https://github.com/your-org/cognical/discussions)
-- **Documentation**: [Project Wiki](https://github.com/your-org/cognical/wiki)
+Configure your DeepSeek API key in Settings to enable AI features.
 
 ---
 
-**Built with ❤️ by the CogniCal Team**  
-_Transforming task management into intelligent productivity assistance_
+##  License
+
+MIT License - See [LICENSE](./LICENSE) for details.
+
+##  Links
+
+- **GitHub**: [https://github.com/M-24rjgc/CogniCal](https://github.com/M-24rjgc/CogniCal)
+- **Issues**: [Report Bug / Request Feature](https://github.com/M-24rjgc/CogniCal/issues)
+
+---
+
+**Built with  using Tauri + React + Rust**
